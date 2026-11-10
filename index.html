@@ -2,108 +2,296 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport"
-        content="width=device-width, initial-scale=1">
-  <title>B2B Order & Delivery</title>
-  <style>
-    body {
-      margin: 0;
-      font-family: Arial, sans-serif;
-      background: #f3f5f9;
-      color: #17233b;
-    }
-    header {
-      background: #172b4d;
-      color: white;
-      padding: 20px;
-    }
-    header h2 { margin: 0 0 6px; }
-    header small { color: #cbd5e1; }
-    main {
-      max-width: 1100px;
-      margin: auto;
-      padding: 20px;
-    }
-    .grid {
-      display: grid;
-      grid-template-columns:
-        repeat(auto-fit, minmax(220px, 1fr));
-      gap: 16px;
-    }
-    .card {
-      background: white;
-      border: 1px solid #e0e5ed;
-      border-radius: 12px;
-      padding: 24px;
-      text-align: left;
-      cursor: pointer;
-      font-size: 17px;
-    }
-    .card:hover { border-color: #2563eb; }
-    .card span {
-      display: block;
-      margin-top: 10px;
-      font-size: 13px;
-      color: #64748b;
-    }
-    #content {
-      margin-top: 24px;
-      background: white;
-      border-radius: 12px;
-      padding: 24px;
-      min-height: 100px;
-    }
-    button { font-family: inherit; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>B2B Order & Delivery</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f3f5fa;color:#17233b}
+header{background:#172b4d;color:white;padding:18px 24px}
+header h2{margin:0 0 7px}
+header small{color:#cbd5e1}
+nav{display:flex;gap:8px;flex-wrap:wrap;background:white;padding:12px;border-bottom:1px solid #ddd}
+button{cursor:pointer;border:0;border-radius:7px;padding:11px 15px;background:#2563eb;color:white}
+nav button{background:#e8edf6;color:#172b4d}
+nav button.active{background:#172b4d;color:white}
+main{max-width:1150px;margin:auto;padding:20px}
+.panel{background:white;border:1px solid #e1e5ed;border-radius:12px;padding:20px;margin-bottom:16px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+label{display:block;font-size:13px;font-weight:bold;margin-bottom:5px}
+input,select,textarea{width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:6px;font:inherit}
+.field{margin-bottom:12px}
+table{width:100%;border-collapse:collapse}
+th,td{padding:10px;border-bottom:1px solid #e5e7eb;text-align:left;font-size:14px}
+th{background:#f1f5f9}
+.scroll{overflow-x:auto}
+.muted{color:#64748b;font-size:13px}
+.total{background:#eff6ff;border-radius:8px;padding:16px;margin:12px 0}
+.small{padding:6px 10px;font-size:12px}
+.danger{background:#b91c1c}
+section{display:none}
+section.active{display:block}
+@media(max-width:600px){main{padding:10px}.panel{padding:13px}nav button{flex:1}}
+</style>
 </head>
 <body>
-  <header>
-    <h2>B2B Order & Delivery</h2>
-    <small>Ex Factory | GST Extra | Freight To-Pay</small>
-  </header>
+<header>
+<h2>B2B Order & Delivery</h2>
+<small>Ex Factory | GST Extra | Freight To-Pay | Local Data</small>
+</header>
+<nav id="nav">
+<button onclick="page('home')">Dashboard</button>
+<button onclick="page('items')">Item Master</button>
+<button onclick="page('customers')">Customers</button>
+<button onclick="page('orders')">New Order</button>
+<button onclick="page('history')">Order History</button>
+<button onclick="page('backup')">Backup</button>
+</nav>
+<main>
+<section id="home" class="active">
+<div class="panel">
+<h2>Application Dashboard</h2>
+<p>Welcome to B2B Order & Delivery Management.</p>
+<div class="grid">
+<div class="total"><b id="itemCount">0</b><p>Items</p></div>
+<div class="total"><b id="customerCount">0</b><p>Customers</p></div>
+<div class="total"><b id="orderCount">0</b><p>Orders</p></div>
+</div>
+</div>
+</section>
 
-  <main>
-    <h2>Application Dashboard</h2>
-    <div class="grid">
-      <button class="card" onclick="openPage('Item Master')">
-        Item Master
-        <span>Products, cartons, weight and CBM</span>
-      </button>
-      <button class="card" onclick="openPage('Customer Master')">
-        Customer Master
-        <span>Dealers, GSTIN and PIN lookup</span>
-      </button>
-      <button class="card" onclick="openPage('Delivery Partners')">
-        Delivery Partners
-        <span>Transporters and To-Pay freight</span>
-      </button>
-      <button class="card" onclick="openPage('New Order')">
-        New Order
-        <span>Order discount, GST and delivery</span>
-      </button>
-      <button class="card" onclick="openPage('Received Orders')">
-        Received Orders
-        <span>Import and revision review</span>
-      </button>
-      <button class="card" onclick="openPage('Update Manager')">
-        Update Manager
-        <span>Software and master-data updates</span>
-      </button>
-    </div>
-    <section id="content">
-      <h3>Welcome</h3>
-      <p>Select a module above.</p>
-    </section>
-  </main>
+<section id="items">
+<div class="panel">
+<h2>Item Master</h2>
+<div class="grid">
+<div class="field"><label>Item Code</label><input id="icode"></div>
+<div class="field"><label>Item Name</label><input id="iname"></div>
+<div class="field"><label>MRP ₹</label><input id="imrp" type="number" min="0"></div>
+</div>
+<h3>Carton Details</h3>
+<p class="muted">Enter gross weight including packing. Each carton can use cm, mm or inch.</p>
+<div id="cartons"></div>
+<button onclick="addCarton()">+ Add Carton</button>
+<div class="total" id="itemSummary"></div>
+<button onclick="saveItem()">Save Item</button>
+</div>
+<div class="panel">
+<h3>Saved Items</h3>
+<div class="scroll"><table><thead><tr><th>Code</th><th>Name</th><th>MRP</th><th>Gross kg</th><th>CBM</th><th>Action</th></tr></thead><tbody id="itemRows"></tbody></table></div>
+</div>
+</section>
 
-  <script>
-    function openPage(name) {
-      document.getElementById("content").innerHTML =
-        "<h3>" + name + "</h3>" +
-        "<p>Module selected. Detailed functionality " +
-        "will be added in the next development stage.</p>";
-    }
-  </script>
+<section id="customers">
+<div class="panel">
+<h2>Customer / Party Master</h2>
+<div class="grid">
+<div class="field"><label>Party Name</label><input id="cname"></div>
+<div class="field"><label>Mobile 1</label><input id="cm1"></div>
+<div class="field"><label>Mobile 2</label><input id="cm2"></div>
+<div class="field"><label>Mobile 3</label><input id="cm3"></div>
+<div class="field"><label>GSTIN</label><input id="cgst"></div>
+<div class="field"><label>PIN Code</label><input id="cpin" maxlength="6"></div>
+<div class="field"><label>City / District</label><input id="ccity"></div>
+<div class="field"><label>State</label><input id="cstate"></div>
+</div>
+<div class="field"><label>Complete Address</label><textarea id="caddress"></textarea></div>
+<button onclick="lookupPin()">Check PIN Code</button>
+<select id="locality" style="margin:10px 0" onchange="chooseLocality()">
+<option value="">Select locality if available</option>
+</select>
+<p class="muted" id="pinStatus"></p>
+<button onclick="saveCustomer()">Save Customer</button>
+</div>
+<div class="panel">
+<h3>Saved Customers</h3>
+<div class="scroll"><table><tbody id="customerRows"></tbody></table></div>
+</div>
+</section>
+
+<section id="orders">
+<div class="panel">
+<h2>New B2B Order</h2>
+<div class="field"><label>Customer</label><select id="oparty"></select></div>
+<h3>Order Items</h3>
+<div id="orderLines"></div>
+<button onclick="addLine()">+ Add Item</button>
+<div class="grid" style="margin-top:18px">
+<div class="field"><label>Order Discount % (All Items)</label><input id="odisc" type="number" min="0" max="100" value="0" oninput="calculate()"></div>
+<div class="field"><label>Delivery Partner</label><input id="otransport" placeholder="Transporter name"></div>
+<div class="field"><label>Delivery Type</label><select id="oservice"><option>Surface</option><option>Express</option><option>Air</option></select></div>
+<div class="field"><label>Estimated Freight ₹ (To-Pay)</label><input id="ofreight" type="number" min="0" value="0" oninput="calculate()"></div>
+</div>
+<div class="total" id="orderSummary"></div>
+<button onclick="saveOrder()">Save Order</button>
+</div>
+</section>
+
+<section id="history">
+<div class="panel"><h2>Order History</h2><div id="orderHistory"></div></div>
+</section>
+
+<section id="backup">
+<div class="panel">
+<h2>Backup & Restore</h2>
+<p>Export your local items, customers and orders regularly.</p>
+<button onclick="backup()">Download JSON Backup</button>
+<h3>Restore Backup</h3>
+<input type="file" accept=".json" id="restoreFile">
+<button onclick="restore()">Restore</button>
+<p class="muted">Restoring replaces the current local records. Keep a backup first.</p>
+</div>
+</section>
+</main>
+
+<script>
+const KEY="b2b-order-v1";
+let db;
+try{
+db=JSON.parse(localStorage.getItem(KEY))||{};
+}catch(e){db={}}
+db.items ||= [];
+db.customers ||= [];
+db.orders ||= [];
+let cartons=[];
+let lines=[];
+const $=id=>document.getElementById(id);
+const val=id=>$(id).value;
+const money=n=>"₹"+Number(n||0).toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2});
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+function persist(){localStorage.setItem(KEY,JSON.stringify(db));render()}
+function page(id){
+document.querySelectorAll("section").forEach(x=>x.classList.toggle("active",x.id===id));
+document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("active",b.getAttribute("onclick")==="page('"+id+"')"));
+render();
+}
+function addCarton(c){
+cartons.push(c||{name:"Carton",qty:1,l:0,w:0,h:0,unit:"cm",gross:0});
+renderCartons();
+}
+function cartonVolume(c){
+let f={cm:1,mm:.1,inch:2.54}[c.unit]||1;
+return Number(c.l)*Number(c.w)*Number(c.h)*Math.pow(f,3)*Number(c.qty)/1000000;
+}
+function renderCartons(){
+$("cartons").innerHTML=cartons.map((c,i)=>`
+<div class="panel" style="background:#f8fafc">
+<b>Carton ${i+1}</b>
+<div class="grid">
+${[["name","Carton Name","text"],["qty","Carton Qty","number"],["l","Length","number"],["w","Width","number"],["h","Height","number"],["gross","Gross Weight kg / Carton","number"]].map(([k,label,type])=>`
+<div class="field"><label>${label}</label><input type="${type}" value="${esc(c[k])}" onchange="cartonChange(${i},'${k}',this.value)"></div>`).join("")}
+<div class="field"><label>Unit</label><select onchange="cartonChange(${i},'unit',this.value)">
+${["cm","mm","inch"].map(u=>`<option ${c.unit===u?"selected":""}>${u}</option>`).join("")}
+</select></div></div>
+<p>CBM: ${cartonVolume(c).toFixed(4)}</p>
+<button class="small danger" onclick="cartons.splice(${i},1);renderCartons()">Remove</button>
+</div>`).join("");
+$("itemSummary").textContent="Total CBM: "+cartons.reduce((s,c)=>s+cartonVolume(c),0).toFixed(4)+" | Total Gross Weight: "+cartons.reduce((s,c)=>s+Number(c.gross)*Number(c.qty),0).toFixed(2)+" kg";
+}
+function cartonChange(i,k,v){
+cartons[i][k]=k==="name"||k==="unit"?v:Number(v);
+renderCartons();
+}
+function saveItem(){
+let code=val("icode").trim();
+if(!code||!val("iname").trim()||Number(val("imrp"))<0||!cartons.length||cartons.some(c=>!c.l||!c.w||!c.h||!c.qty||Number(c.gross)<0)){alert("Enter valid item and carton details");return}
+let item={code,name:val("iname"),mrp:Number(val("imrp")),cartons:structuredClone(cartons)};
+let i=db.items.findIndex(x=>x.code===code);
+if(i>=0)db.items[i]=item;else db.items.push(item);
+persist();alert("Item saved");
+}
+function editItem(code){
+let x=db.items.find(a=>a.code===code);
+if(!x)return;
+$("icode").value=x.code;$("iname").value=x.name;$("imrp").value=x.mrp;
+cartons=structuredClone(x.cartons);renderCartons();page("items");
+}
+async function lookupPin(){
+let p=val("cpin").trim();
+if(!/^\d{6}$/.test(p)){alert("Enter valid six-digit PIN");return}
+$("pinStatus").textContent="Looking up PIN...";
+try{
+let r=await fetch("https://api.postalpincode.in/pincode/"+p);
+let data=await r.json();
+let offices=data[0]?.PostOffice||[];
+if(!offices.length)throw Error("PIN not found");
+window.pinOffices=offices;
+$("locality").innerHTML=offices.map((o,i)=>`<option value="${i}">${esc(o.Name)}</option>`).join("");
+chooseLocality();
+$("pinStatus").textContent="PIN details found. Please verify the delivery address.";
+}catch(e){$("pinStatus").textContent="Lookup unavailable. Enter address manually."}
+}
+function chooseLocality(){
+let o=window.pinOffices?.[Number(val("locality"))];
+if(o){$("ccity").value=o.District;$("cstate").value=o.State}
+}
+function saveCustomer(){
+if(!val("cname").trim()||!/^\d{6}$/.test(val("cpin"))){alert("Enter party name and valid PIN");return}
+let x={id:crypto.randomUUID(),name:val("cname"),mobile:[val("cm1"),val("cm2"),val("cm3")],gstin:val("cgst"),pin:val("cpin"),city:val("ccity"),state:val("cstate"),address:val("caddress")};
+db.customers.push(x);persist();alert("Customer saved");
+}
+function addLine(){
+lines.push({code:db.items[0]?.code||"",qty:1});
+renderLines();
+}
+function renderLines(){
+$("orderLines").innerHTML=lines.map((l,i)=>`
+<div class="grid" style="margin-bottom:12px">
+<div class="field"><label>Item</label><select onchange="lines[${i}].code=this.value;calculate()">
+${db.items.map(x=>`<option value="${esc(x.code)}" ${l.code===x.code?"selected":""}>${esc(x.code)} — ${esc(x.name)}</option>`).join("")}</select></div>
+<div class="field"><label>Quantity</label><input type="number" min="1" value="${l.qty}" onchange="lines[${i}].qty=Number(this.value);calculate()"></div>
+<div><label>Remove</label><button class="danger" onclick="lines.splice(${i},1);renderLines();calculate()">X</button></div>
+</div>`).join("");
+calculate();
+}
+function totals(){
+let disc=Math.max(0,Math.min(100,Number(val("odisc"))||0));
+let mrp=lines.reduce((s,l)=>s+(db.items.find(x=>x.code===l.code)?.mrp||0)*Number(l.qty),0);
+let taxable=mrp*(1-disc/100);
+return{mrp,disc,taxable,gst:taxable*.18,total:taxable*1.18};
+}
+function calculate(){
+let t=totals();
+$("orderSummary").innerHTML=`
+Total MRP: ${money(t.mrp)}<br>
+Order Discount: ${t.disc}%<br>
+Ex Factory Value: ${money(t.taxable)}<br>
+GST 18%: ${money(t.gst)}<hr>
+<b>Seller Order Total: ${money(t.total)}</b><br>
+Estimated Freight To-Pay: ${money(val("ofreight"))}
+<p class="muted">Freight is payable directly to the transporter and excluded from the seller total.</p>`;
+}
+function saveOrder(){
+if(!val("oparty")||!lines.length||lines.some(l=>!l.code||l.qty<=0)){alert("Select customer and valid items");return}
+let t=totals();
+let order={id:crypto.randomUUID(),date:new Date().toISOString(),party:val("oparty"),lines:lines.map(l=>({...l,item:structuredClone(db.items.find(x=>x.code===l.code))})),discount:t.disc,totals:t,transport:val("otransport"),service:val("oservice"),freight:Number(val("ofreight"))||0};
+db.orders.push(order);persist();alert("Order saved");
+}
+function download(name,content,type){
+let a=document.createElement("a"),url=URL.createObjectURL(new Blob([content],{type}));
+a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+function backup(){download("b2b-backup.json",JSON.stringify(db,null,2),"application/json")}
+async function restore(){
+let f=$("restoreFile").files[0];if(!f)return;
+try{
+let d=JSON.parse(await f.text());
+if(!Array.isArray(d.items)||!Array.isArray(d.customers)||!Array.isArray(d.orders))throw Error();
+if(!confirm("Replace all current local records with this backup?"))return;
+db=d;persist();alert("Backup restored");
+}catch(e){alert("Invalid backup file")}
+}
+function render(){
+$("itemCount").textContent=db.items.length;
+$("customerCount").textContent=db.customers.length;
+$("orderCount").textContent=db.orders.length;
+$("itemRows").innerHTML=db.items.map(x=>`<tr><td>${esc(x.code)}</td><td>${esc(x.name)}</td><td>${money(x.mrp)}</td><td>${x.cartons.reduce((s,c)=>s+Number(c.gross)*Number(c.qty),0).toFixed(2)}</td><td>${x.cartons.reduce((s,c)=>s+cartonVolume(c),0).toFixed(4)}</td><td><button class="small" onclick="editItem('${esc(x.code)}')">Edit</button></td></tr>`).join("");
+$("customerRows").innerHTML=db.customers.map(x=>`<tr><td>${esc(x.name)}</td><td>${esc(x.city)}</td><td>${esc(x.state)}</td><td>${esc(x.pin)}</td></tr>`).join("");
+$("oparty").innerHTML=db.customers.map(x=>`<option value="${esc(x.id)}">${esc(x.name)}</option>`).join("");
+$("orderHistory").innerHTML=db.orders.map((o,i)=>`<div class="panel"><b>Order ${i+1}</b><p>${esc(db.customers.find(c=>c.id===o.party)?.name||"Customer")}</p><p>${money(o.totals.total)} | To-Pay freight ${money(o.freight)}</p><button onclick="download('order-${i+1}.json',JSON.stringify(db.orders[${i}],null,2),'application/json')">Export JSON</button></div>`).join("");
+}
+addCarton();
+addLine();
+page("home");
+</script>
 </body>
 </html>
