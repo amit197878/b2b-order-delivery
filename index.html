@@ -61,6 +61,34 @@ section.active{display:block}
 </section>
 
 <section id="items">
+
+<div class="panel" style="background:#f8fafc">
+  <h3>Item Master - Excel Management</h3>
+  <p class="muted">
+    One row per item. Maximum 4 cartons.
+    Dimensions: cm, mm or inch.
+  </p>
+
+  <button onclick="downloadItemTemplate()">
+    Download Excel Template
+  </button>
+
+  <button onclick="exportItemExcel()">
+    Export Item Master
+  </button>
+
+  <div style="margin-top:12px">
+    <label>Import Item Master</label>
+    <input type="file"
+           id="itemExcelFile"
+           accept=".xlsx,.xls,.csv">
+  </div>
+
+  <button onclick="importItemExcel()">
+    Import Excel
+  </button>
+</div>
+
 <div class="panel">
 <h2>Item Master</h2>
 <div class="grid">
@@ -146,7 +174,8 @@ section.active{display:block}
 </section>
 </main>
 
-<script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+  <script>
 const KEY="b2b-order-v1";
 let db;
 try{
@@ -273,7 +302,179 @@ function download(name,content,type){
 let a=document.createElement("a"),url=URL.createObjectURL(new Blob([content],{type}));
 a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
-function backup(){download("b2b-backup.json",JSON.stringify(db,null,2),"application/json")}
+
+
+const ITEM_HEADERS = [
+  "Item Code", "Item Name", "MRP", "No. of Cartons", "Unit",
+  ...[1,2,3,4].flatMap(n => [
+    `Carton ${n} Length`,
+    `Carton ${n} Width`,
+    `Carton ${n} Height`,
+    `Carton ${n} Gross Weight`
+  ]),
+  "Total CBM", "Total Gross Weight"
+];
+
+function makeItemWorkbook(items, template=false) {
+  if (!window.XLSX) {
+    alert("Excel library not loaded. Check internet connection.");
+    return;
+  }
+
+  const rows = items.map(item => {
+    const cs = (item.cartons || []).slice(0,4);
+    const unit = cs[0]?.unit || "cm";
+    const cells = [];
+
+    for (let i=0;i<4;i++) {
+      const c=cs[i];
+      cells.push(
+        c?.l ?? "",
+        c?.w ?? "",
+        c?.h ?? "",
+        c?.gross ?? ""
+      );
+    }
+
+    return [
+      item.code,
+      item.name,
+      item.mrp,
+      cs.length,
+      unit,
+      ...cells,
+      cs.reduce((s,c)=>s+cartonVolume(c),0),
+      cs.reduce((s,c)=>s+Number(c.gross)*Number(c.qty||1),0)
+    ];
+  });
+
+  const ws = XLSX.utils.aoa_to_sheet([ITEM_HEADERS,...rows]);
+  ws["!cols"] = ITEM_HEADERS.map((h,i)=>({
+    wch:i===1?28:i===0?20:18
+  }));
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,"Item Master");
+
+  XLSX.writeFile(
+    wb,
+    template ? "Item_Master_Template.xlsx" : "Item_Master_Export.xlsx"
+  );
+}
+
+function downloadItemTemplate() {
+  makeItemWorkbook([], true);
+}
+function exportItemExcel() {
+  makeItemWorkbook(db.items);
+}
+
+async function importItemExcel() {
+  const file = document.getElementById("itemExcelFile").files[0];
+
+  if (!file) {
+    alert("Please select an Excel file.");
+    return;
+  }
+
+  if (!window.XLSX) {
+    alert("Excel library is not available.");
+    return;
+  }
+
+  try {
+    const data = await file.arrayBuffer();
+    const wb = XLSX.read(data,{type:"array"});
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws,{
+      header:1,defval:""
+    });
+
+    if (JSON.stringify(rows[0]) !== JSON.stringify(ITEM_HEADERS)) {
+      alert("Excel columns do not match the approved Item Master template.");
+      return;
+    }
+
+    const imported=[];
+    const errors=[];
+
+    rows.slice(1).forEach((r,index)=>{
+      if (!r.some(v=>String(v).trim()!=="")) return;
+
+      const code=String(r[0]).trim();
+      const name=String(r[1]).trim();
+      const mrp=Number(r[2]);
+      const count=Number(r[3]);
+      const unit=String(r[4]).trim().toLowerCase();
+
+      if (!/^[a-zA-Z0-9 /-]+$/.test(code) ||
+          !name || !Number.isFinite(mrp) || mrp<0 ||
+          !Number.isInteger(count) || count<1 || count>4 ||
+          !["cm","mm","inch"].includes(unit)) {
+        errors.push(index+2);
+        return;
+      }
+
+      const cs=[];
+      let valid=true;
+
+      for(let i=0;i<count;i++){
+        const base=5+i*4;
+        const l=Number(r[base]);
+        const w=Number(r[base+1]);
+        const h=Number(r[base+2]);
+        const gross=Number(r[base+3]);
+
+        if (![l,w,h,gross].every(Number.isFinite) ||
+            l<=0 || w<=0 || h<=0 || gross<0) {
+          valid=false;
+          break;
+        }
+
+        cs.push({
+          name:"Carton "+(i+1),
+          qty:1,l,w,h,gross,unit
+        });
+      }
+
+      if(!valid){
+        errors.push(index+2);
+        return;
+      }
+
+      imported.push({code,name,mrp,cartons:cs});
+    });
+
+    if(errors.length){
+      alert("Import stopped. Check Excel rows: "+errors.join(", "));
+      return;
+    }
+
+    if(!imported.length){
+      alert("No items found.");
+      return;
+    }
+
+    if(!confirm(
+      "Import "+imported.length+
+      " items? Matching Item Codes will be updated."
+    )) return;
+
+    imported.forEach(item=>{
+      const i=db.items.findIndex(x=>x.code===item.code);
+      if(i>=0) db.items[i]=item;
+      else db.items.push(item);
+    });
+
+    persist();
+    alert(imported.length+" items imported successfully.");
+
+  }catch(e){
+    alert("Unable to read Excel file: "+e.message);
+  }
+}
+   
+    function backup(){download("b2b-backup.json",JSON.stringify(db,null,2),"application/json")}
 async function restore(){
 let f=$("restoreFile").files[0];if(!f)return;
 try{
