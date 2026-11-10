@@ -112,6 +112,35 @@ section.active{display:block}
 <section id="customers">
 <div class="panel">
 <h2>Customer / Party Master</h2>
+
+<div class="panel" style="background:#f8fafc">
+  <h3>Customer Master - Excel Management</h3>
+
+  <p class="muted">
+    Download template, import customers or export saved customers.
+  </p>
+
+  <button onclick="downloadCustomerTemplate()">
+    Download Excel Template
+  </button>
+
+  <button onclick="exportCustomerExcel()">
+    Export Customer Master
+  </button>
+
+  <div style="margin-top:12px">
+    <label>Import Customer Master</label>
+    <input type="file"
+           id="customerExcelFile"
+           accept=".xlsx,.xls">
+  </div>
+
+  <button onclick="importCustomerExcel()">
+    Import Excel
+  </button>
+</div>
+
+  
 <div class="grid">
 <div class="field"><label>Party Name</label><input id="cname"></div>
 <div class="field"><label>Mobile 1</label><input id="cm1"></div>
@@ -489,6 +518,212 @@ if (errors.length) {
   }
 }
    
+
+const CUSTOMER_HEADERS = [
+  "Party Name",
+  "Complete Address",
+  "City",
+  "State",
+  "PIN Code",
+  "Mobile 1",
+  "Mobile 2",
+  "Mobile 3",
+  "GSTIN"
+];
+
+function makeCustomerWorkbook(customers, template=false) {
+  if (!window.XLSX) {
+    alert("Excel library not loaded. Check internet connection.");
+    return;
+  }
+
+  const rows = customers.map(c => [
+    c.name || "",
+    c.address || "",
+    c.city || "",
+    c.state || "",
+    String(c.pin || ""),
+    String(c.mobile?.[0] || ""),
+    String(c.mobile?.[1] || ""),
+    String(c.mobile?.[2] || ""),
+    c.gstin || ""
+  ]);
+
+  const ws = XLSX.utils.aoa_to_sheet([
+    CUSTOMER_HEADERS,
+    ...rows
+  ]);
+
+  ws["!cols"] = [
+    {wch:30}, {wch:45}, {wch:22},
+    {wch:22}, {wch:15}, {wch:18},
+    {wch:18}, {wch:18}, {wch:22}
+  ];
+
+  // Keep PIN and mobile numbers as text.
+  for (let r=1;r<=rows.length;r++) {
+    for (const col of ["E","F","G","H"]) {
+      const cell=ws[col+(r+1)];
+      if (cell) {
+        cell.t="s";
+        cell.v=String(cell.v ?? "");
+      }
+    }
+  }
+
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(
+    wb,ws,"Customer Master"
+  );
+
+  XLSX.writeFile(
+    wb,
+    template
+      ? "Customer_Master_Template.xlsx"
+      : "Customer_Master_Export.xlsx"
+  );
+}
+
+function downloadCustomerTemplate() {
+  makeCustomerWorkbook([],true);
+}
+
+function exportCustomerExcel() {
+  makeCustomerWorkbook(db.customers);
+}
+
+async function importCustomerExcel() {
+  const file=document.getElementById(
+    "customerExcelFile"
+  ).files[0];
+
+  if (!file) {
+    alert("Please select a Customer Master Excel file.");
+    return;
+  }
+
+  if (!window.XLSX) {
+    alert("Excel library is not available.");
+    return;
+  }
+
+  try {
+    const buffer=await file.arrayBuffer();
+    const wb=XLSX.read(buffer,{type:"array"});
+    const ws=wb.Sheets[wb.SheetNames[0]];
+
+    const rows=XLSX.utils.sheet_to_json(ws,{
+      header:1,
+      defval:"",
+      raw:false
+    });
+
+    const headers=rows[0] || [];
+
+    if (JSON.stringify(headers) !==
+        JSON.stringify(CUSTOMER_HEADERS)) {
+      alert("Excel columns do not match the Customer Master template.");
+      return;
+    }
+
+    const imported=[];
+    const errors=[];
+    const seen=new Set();
+
+    rows.slice(1).forEach((r,index)=>{
+      const name=String(r[0] ?? "").trim();
+
+      // Ignore blank template rows.
+      if (!name) return;
+
+      const address=String(r[1] ?? "").trim();
+      const city=String(r[2] ?? "").trim();
+      const state=String(r[3] ?? "").trim();
+      const pin=String(r[4] ?? "").trim();
+
+      const mobiles=[
+        String(r[5] ?? "").trim(),
+        String(r[6] ?? "").trim(),
+        String(r[7] ?? "").trim()
+      ];
+
+      const gstin=String(r[8] ?? "")
+        .trim().toUpperCase();
+
+      const key=name.toLowerCase()+"|"+pin;
+
+      if (!city || !state ||
+          !/^\d{6}$/.test(pin) ||
+          mobiles.some(m=>m && !/^\d{10}$/.test(m)) ||
+          (gstin && !/^[0-9A-Z]{15}$/.test(gstin)) ||
+          seen.has(key)) {
+        errors.push(index+2);
+        return;
+      }
+
+      seen.add(key);
+
+      imported.push({
+        id:crypto.randomUUID(),
+        name,address,city,state,pin,
+        mobile:mobiles,gstin
+      });
+    });
+
+    if (errors.length) {
+      alert(
+        "Import stopped. Check Excel rows: "+
+        errors.join(", ")
+      );
+      return;
+    }
+
+    if (!imported.length) {
+      alert("No customers found in Excel.");
+      return;
+    }
+
+    const newCustomers=[];
+    const duplicates=[];
+
+    imported.forEach(c=>{
+      const existing=db.customers.find(x=>
+        x.name.trim().toLowerCase()===
+          c.name.toLowerCase() &&
+        String(x.pin)===c.pin
+      );
+
+      if (existing) duplicates.push(c.name);
+      else newCustomers.push(c);
+    });
+
+    const message=
+      "New customers: "+newCustomers.length+
+      "\nExisting customers skipped: "+duplicates.length+
+      "\n\nImport new customers?";
+
+    if (!confirm(message)) return;
+
+    // Add new customers only.
+    // Existing customer records remain unchanged.
+    db.customers.push(...newCustomers);
+
+    persist();
+
+    alert(
+      newCustomers.length+
+      " customers imported successfully.\n"+
+      duplicates.length+
+      " existing customers skipped."
+    );
+
+  } catch(e) {
+    alert("Unable to read Excel file: "+e.message);
+  }
+}
+   
+    
+    
     function backup(){download("b2b-backup.json",JSON.stringify(db,null,2),"application/json")}
 async function restore(){
 let f=$("restoreFile").files[0];if(!f)return;
