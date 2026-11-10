@@ -177,8 +177,30 @@ section.active{display:block}
 <h3>Order Items</h3>
 <div id="orderLines"></div>
 <button onclick="addLine()">+ Add Item</button>
+  
+<div class="panel" style="background:#f8fafc;margin-top:16px">
+  <h3>Packing & Shipment Summary</h3>
+
+  <div class="grid">
+    <div class="total">
+      <b id="totalOrderCartons">0</b>
+      <p>Total Cartons</p>
+    </div>
+
+    <div class="total">
+      <b id="totalOrderWeight">0.00 kg</b>
+      <p>Total Gross Weight</p>
+    </div>
+
+    <div class="total">
+      <b id="totalOrderCBM">0.0000</b>
+      <p>Total CBM</p>
+    </div>
+  </div>
+</div>
+
 <div class="grid" style="margin-top:18px">
-<div class="field"><label>Order Discount % (All Items)</label><input id="odisc" type="number" min="0" max="100" value="0" oninput="calculate()"></div>
+
 <div class="field"><label>Delivery Partner</label><input id="otransport" placeholder="Transporter name"></div>
 <div class="field"><label>Delivery Type</label><select id="oservice"><option>Surface</option><option>Express</option><option>Air</option></select></div>
 <div class="field"><label>Estimated Freight ₹ (To-Pay)</label><input id="ofreight" type="number" min="0" value="0" oninput="calculate()"></div>
@@ -386,43 +408,330 @@ function saveCustomer() {
   alert("Customer saved successfully.");
 }
 
-function addLine(){
-lines.push({code:db.items[0]?.code||"",qty:1});
-renderLines();
+
+function addLine() {
+  lines.push({
+    code: db.items[0]?.code || "",
+    qty: 1,
+    discount: 0
+  });
+  renderLines();
 }
-function renderLines(){
-$("orderLines").innerHTML=lines.map((l,i)=>`
-<div class="grid" style="margin-bottom:12px">
-<div class="field"><label>Item</label><select onchange="lines[${i}].code=this.value;calculate()">
-${db.items.map(x=>`<option value="${esc(x.code)}" ${l.code===x.code?"selected":""}>${esc(x.code)} — ${esc(x.name)}</option>`).join("")}</select></div>
-<div class="field"><label>Quantity</label><input type="number" min="1" value="${l.qty}" onchange="lines[${i}].qty=Number(this.value);calculate()"></div>
-<div><label>Remove</label><button class="danger" onclick="lines.splice(${i},1);renderLines();calculate()">X</button></div>
-</div>`).join("");
-calculate();
+
+function renderLines() {
+  $("orderLines").innerHTML = `
+    <div class="scroll">
+      <table style="min-width:1150px">
+        <thead>
+          <tr>
+            <th>Item Code / Name</th>
+            <th>Qty</th>
+            <th>MRP</th>
+            <th>Disc. %</th>
+            <th>Selling Price</th>
+            <th>Item Value</th>
+            <th>Cartons</th>
+            <th>Gross kg</th>
+            <th>CBM</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${lines.map((line,i) => {
+            const item = db.items.find(
+              x => x.code === line.code
+            );
+            const qty = Number(line.qty) || 0;
+            const discount = Number(line.discount) || 0;
+            const mrp = Number(item?.mrp) || 0;
+            const selling = mrp*(1-discount/100);
+            const cartons = item?.cartons || [];
+
+            const cartonCount = cartons.reduce(
+              (s,c) => s+Number(c.qty || 1),0
+            )*qty;
+
+            const weight = cartons.reduce(
+              (s,c) => s+
+              Number(c.gross)*Number(c.qty || 1),0
+            )*qty;
+
+            const cbm = cartons.reduce(
+              (s,c) => s+cartonVolume(c),0
+            )*qty;
+
+            return `
+              <tr>
+                <td>
+                  <select
+                    onchange="updateOrderLine(${i},'code',this.value)">
+                    ${db.items.map(x => `
+                      <option value="${esc(x.code)}"
+                        ${line.code===x.code?"selected":""}>
+                        ${esc(x.code)} - ${esc(x.name)}
+                      </option>
+                    `).join("")}
+                  </select>
+                </td>
+
+                <td>
+                  <input type="number" min="1" step="1"
+                    value="${qty}"
+                    onchange="updateOrderLine(${i},'qty',this.value)"
+                    style="min-width:65px">
+                </td>
+
+                <td>${money(mrp)}</td>
+
+                <td>
+                  <input type="number" min="0" max="100"
+                    step="0.01" value="${discount}"
+                    onchange="updateOrderLine(${i},'discount',this.value)"
+                    style="min-width:75px">
+                </td>
+
+                <td>${money(selling)}</td>
+                <td><b>${money(selling*qty)}</b></td>
+                <td>${cartonCount}</td>
+                <td>${weight.toFixed(2)}</td>
+                <td>${cbm.toFixed(4)}</td>
+
+                <td>
+                  <button class="small danger"
+                    onclick="removeOrderLine(${i})">
+                    Remove
+                  </button>
+                </td>
+              </tr>
+
+              <tr>
+                <td colspan="10">
+                  <details>
+                    <summary style="cursor:pointer">
+                      View Carton Details
+                    </summary>
+                    <div class="scroll">
+                      <table>
+                        <thead>
+                          <tr>
+                            <th>Carton</th>
+                            <th>Qty in Order</th>
+                            <th>Length</th>
+                            <th>Width</th>
+                            <th>Height</th>
+                            <th>Unit</th>
+                            <th>Gross kg</th>
+                            <th>Total CBM</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          ${cartons.map((c,j) => `
+                            <tr>
+                              <td>${esc(c.name || "Carton "+(j+1))}</td>
+                              <td>${Number(c.qty || 1)*qty}</td>
+                              <td>${Number(c.l)}</td>
+                              <td>${Number(c.w)}</td>
+                              <td>${Number(c.h)}</td>
+                              <td>${esc(c.unit)}</td>
+                              <td>${(
+                                Number(c.gross)*
+                                Number(c.qty || 1)*qty
+                              ).toFixed(2)}</td>
+                              <td>${(
+                                cartonVolume(c)*qty
+                              ).toFixed(4)}</td>
+                            </tr>
+                          `).join("")}
+                        </tbody>
+                      </table>
+                    </div>
+                  </details>
+                </td>
+              </tr>
+            `;
+          }).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+  calculate();
 }
-function totals(){
-let disc=Math.max(0,Math.min(100,Number(val("odisc"))||0));
-let mrp=lines.reduce((s,l)=>s+(db.items.find(x=>x.code===l.code)?.mrp||0)*Number(l.qty),0);
-let taxable=mrp*(1-disc/100);
-return{mrp,disc,taxable,gst:taxable*.18,total:taxable*1.18};
+
+function updateOrderLine(index,field,value) {
+  if (!lines[index]) return;
+
+  if (field === "code") {
+    lines[index].code = value;
+  } else if (field === "qty") {
+    const n = Number(value);
+    if (!Number.isInteger(n) || n < 1) {
+      alert("Quantity must be a positive whole number.");
+      renderLines();
+      return;
+    }
+    lines[index].qty = n;
+  } else if (field === "discount") {
+    const n = Number(value);
+    if (!Number.isFinite(n) || n < 0 || n > 100) {
+      alert("Discount must be between 0 and 100%.");
+      renderLines();
+      return;
+    }
+    lines[index].discount = n;
+  }
+
+  renderLines();
 }
-function calculate(){
-let t=totals();
-$("orderSummary").innerHTML=`
-Total MRP: ${money(t.mrp)}<br>
-Order Discount: ${t.disc}%<br>
-Ex Factory Value: ${money(t.taxable)}<br>
-GST 18%: ${money(t.gst)}<hr>
-<b>Seller Order Total: ${money(t.total)}</b><br>
-Estimated Freight To-Pay: ${money(val("ofreight"))}
-<p class="muted">Freight is payable directly to the transporter and excluded from the seller total.</p>`;
+
+function removeOrderLine(index) {
+  lines.splice(index,1);
+  renderLines();
 }
-function saveOrder(){
-if(!val("oparty")||!lines.length||lines.some(l=>!l.code||l.qty<=0)){alert("Select customer and valid items");return}
-let t=totals();
-let order={id:crypto.randomUUID(),date:new Date().toISOString(),party:val("oparty"),lines:lines.map(l=>({...l,item:structuredClone(db.items.find(x=>x.code===l.code))})),discount:t.disc,totals:t,transport:val("otransport"),service:val("oservice"),freight:Number(val("ofreight"))||0};
-db.orders.push(order);persist();alert("Order saved");
+
+function totals() {
+  let mrp = 0;
+  let taxable = 0;
+  let totalCartons = 0;
+  let totalWeight = 0;
+  let totalCBM = 0;
+
+  const details = lines.map(line => {
+    const item = db.items.find(
+      x => x.code === line.code
+    );
+    if (!item) return null;
+
+    const qty = Number(line.qty);
+    const discount = Number(line.discount || 0);
+    const unitMRP = Number(item.mrp);
+    const sellingPrice = unitMRP*(1-discount/100);
+    const itemValue = sellingPrice*qty;
+
+    const cartonsPerItem = item.cartons.reduce(
+      (s,c) => s+Number(c.qty || 1),0
+    );
+    const weightPerItem = item.cartons.reduce(
+      (s,c) => s+
+      Number(c.gross)*Number(c.qty || 1),0
+    );
+    const cbmPerItem = item.cartons.reduce(
+      (s,c) => s+cartonVolume(c),0
+    );
+
+    mrp += unitMRP*qty;
+    taxable += itemValue;
+    totalCartons += cartonsPerItem*qty;
+    totalWeight += weightPerItem*qty;
+    totalCBM += cbmPerItem*qty;
+
+    return {
+      code:item.code,
+      name:item.name,
+      qty,discount,
+      mrp:unitMRP,
+      sellingPrice,
+      itemValue,
+      cartons:cartonsPerItem*qty,
+      grossWeight:weightPerItem*qty,
+      cbm:cbmPerItem*qty
+    };
+  }).filter(Boolean);
+
+  const gst = taxable*0.18;
+
+  return {
+    mrp,
+    discountAmount:mrp-taxable,
+    taxable,
+    gst,
+    total:taxable+gst,
+    totalCartons,
+    totalWeight,
+    totalCBM,
+    details
+  };
 }
+
+function calculate() {
+  const t = totals();
+
+  $("totalOrderCartons").textContent =
+    t.totalCartons;
+
+  $("totalOrderWeight").textContent =
+    t.totalWeight.toFixed(2)+" kg";
+
+  $("totalOrderCBM").textContent =
+    t.totalCBM.toFixed(4);
+
+  $("orderSummary").innerHTML = `
+    <b>Order Pricing Summary</b>
+    <p>Total MRP: ${money(t.mrp)}</p>
+    <p>Total Discount: ${money(t.discountAmount)}</p>
+    <p>Ex Factory Value: ${money(t.taxable)}</p>
+    <p>GST 18%: ${money(t.gst)}</p>
+    <hr>
+    <h3>Customer Order Value: ${money(t.total)}</h3>
+    <p>
+      Estimated Freight To-Pay:
+      ${money(Math.max(0,Number(val("ofreight"))||0))}
+    </p>
+    <p class="muted">
+      Freight is payable directly to the transporter.
+      It is not included in the seller order total.
+    </p>
+  `;
+}
+
+function saveOrder() {
+  if (!val("oparty")) {
+    alert("Please select a customer.");
+    return;
+  }
+
+  if (!lines.length || lines.some(l =>
+    !db.items.some(x=>x.code===l.code) ||
+    !Number.isInteger(Number(l.qty)) ||
+    Number(l.qty)<1 ||
+    !Number.isFinite(Number(l.discount)) ||
+    Number(l.discount)<0 ||
+    Number(l.discount)>100
+  )) {
+    alert("Please check item quantities and discounts.");
+    return;
+  }
+
+  const freight = Number(val("ofreight"));
+  if (!Number.isFinite(freight) || freight < 0) {
+    alert("Enter a valid non-negative freight amount.");
+    return;
+  }
+
+  const t = totals();
+
+  const order = {
+    id: crypto.randomUUID(),
+    date: new Date().toISOString(),
+    party: val("oparty"),
+    lines: lines.map(l => ({
+      code:l.code,
+      qty:Number(l.qty),
+      discount:Number(l.discount || 0),
+      item:structuredClone(
+        db.items.find(x=>x.code===l.code)
+      )
+    })),
+    totals:t,
+    transport:val("otransport").trim(),
+    service:val("oservice"),
+    freight
+  };
+
+  db.orders.push(order);
+  persist();
+  alert("Order saved successfully.");
+}
+
 function download(name,content,type){
 let a=document.createElement("a"),url=URL.createObjectURL(new Blob([content],{type}));
 a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
