@@ -398,8 +398,9 @@ async function importItemExcel() {
     const imported=[];
     const errors=[];
 
-    rows.slice(1).forEach((r,index)=>{
-      if (!r.some(v=>String(v).trim()!=="")) return;
+  rows.slice(1).forEach((r,index)=>{
+  // Skip rows without an Item Code, even if formula cells contain zero.
+  if (!String(r[0] ?? "").trim()) return;
 
       const code=String(r[0]).trim();
       const name=String(r[1]).trim();
