@@ -35,9 +35,64 @@ section.active{display:block}
 </style>
 </head>
 <body>
+  
+<div id="employeeLogin" style="
+  display:none;
+  position:fixed;
+  inset:0;
+  background:#f1f5f9;
+  z-index:9999;
+  align-items:center;
+  justify-content:center;
+  padding:20px;">
+
+  <div class="panel" style="
+    width:100%;
+    max-width:420px;
+    padding:30px;">
+
+    <h2>B2B Enquiry & Delivery Estimator</h2>
+
+    <p class="muted">
+      Employee Identification
+    </p>
+
+    <label>Company-Issued Employee Code</label>
+
+    <input
+      id="employeeCodeInput"
+      placeholder="Example: AS01"
+      maxlength="12"
+      autocomplete="off"
+      style="text-transform:uppercase">
+
+    <p class="muted" style="margin-top:12px">
+      Enter the employee code provided by your company.
+    </p>
+
+    <button onclick="activateEmployee()"
+      style="width:100%">
+      Continue
+    </button>
+
+    <p id="employeeLoginStatus"
+      class="muted"></p>
+
+  </div>
+</div>
+
 <header>
 <h2>B2B Order & Delivery</h2>
 <small>Ex Factory | GST Extra | Freight To-Pay | Local Data</small>
+
+<div style="margin-top:8px;font-size:13px">
+  Employee:
+  <strong id="activeEmployeeDisplay">
+    Not identified
+  </strong>
+</div>
+
+  
 </header>
 <nav id="nav">
 <button onclick="page('home')">Dashboard</button>
@@ -172,7 +227,27 @@ section.active{display:block}
 
 <section id="orders">
 <div class="panel">
-<h2>New B2B Order</h2>
+
+<h2>New B2B Enquiry</h2>
+
+<div class="grid">
+  <div class="field">
+    <label>Enquiry Number (Automatic)</label>
+    <input id="enquiryNumber" readonly
+      placeholder="Generated on Save">
+  </div>
+
+  <div class="field">
+    <label>Enquiry Date</label>
+    <input id="enquiryDate" readonly>
+  </div>
+
+  <div class="field">
+    <label>Marketing Person</label>
+    <input id="enquiryEmployee" readonly>
+  </div>
+</div>
+
 <div class="field"><label>Customer</label><select id="oparty"></select></div>
 <h3>Order Items</h3>
 <div id="orderLines"></div>
@@ -240,6 +315,78 @@ db=JSON.parse(localStorage.getItem(KEY))||{};
 db.items ||= [];
 db.customers ||= [];
 db.orders ||= [];
+    
+/* Employee Master - Company Controlled */
+const EMPLOYEE_MASTER = [
+  {code:"AS01", name:"Amit Singhal", active:true}
+];
+
+/* Employee identification */
+const EMPLOYEE_KEY = "b2b-employee-v1";
+let currentEmployeeCode =
+  localStorage.getItem(EMPLOYEE_KEY) || "";
+
+function getEmployee(code) {
+  return EMPLOYEE_MASTER.find(e =>
+    e.code === String(code).trim().toUpperCase() &&
+    e.active === true
+  );
+}
+
+function saveEmployeeCode(code) {
+  const employee = getEmployee(code);
+
+  if (!employee) {
+    alert("Invalid employee code. Contact your company.");
+    return false;
+  }
+
+  currentEmployeeCode = employee.code;
+  localStorage.setItem(EMPLOYEE_KEY, employee.code);
+  return true;
+}
+
+    
+function activateEmployee() {
+  const code = $("employeeCodeInput").value
+    .trim().toUpperCase();
+
+  if (!saveEmployeeCode(code)) {
+    $("employeeLoginStatus").textContent =
+      "Employee code not found in Company Master.";
+    return;
+  }
+
+  $("employeeLogin").style.display = "none";
+  updateEmployeeDisplay();
+}
+
+function updateEmployeeDisplay() {
+  const el = $("activeEmployeeDisplay");
+  if (!el) return;
+
+  const employee = getEmployee(currentEmployeeCode);
+
+  el.textContent = employee
+    ? employee.name + " (" + employee.code + ")"
+    : "Employee not identified";
+}
+
+function initializeEmployeeLogin() {
+  const employee = getEmployee(currentEmployeeCode);
+
+  if (!employee) {
+    currentEmployeeCode = "";
+    $("employeeLogin").style.display = "flex";
+  } else {
+    $("employeeLogin").style.display = "none";
+  }
+
+  updateEmployeeDisplay();
+  updateEnquiryHeader();
+}
+
+
 let editingCustomerId = null; 
 let cartons=[];
 let lines=[];
@@ -683,6 +830,69 @@ function calculate() {
   `;
 }
 
+
+function enquiryYear(date = new Date()) {
+  return String(date.getFullYear()).slice(-2);
+}
+
+function enquiryDateDisplay(date = new Date()) {
+  const d = String(date.getDate()).padStart(2,"0");
+  const m = String(date.getMonth()+1).padStart(2,"0");
+  return d+"-"+m+"-"+date.getFullYear();
+}
+
+function nextEnquiryNumber() {
+  const employee = getEmployee(currentEmployeeCode);
+
+  if (!employee) {
+    throw new Error("Employee identification required.");
+  }
+
+  const year = enquiryYear();
+  const prefix = employee.code+"/"+year;
+
+  // Find the highest saved serial for this employee and year.
+  let highest = 0;
+
+  db.orders.forEach(order => {
+    const number = String(order.enquiryNumber || "");
+    const parts = number.split("/");
+
+    if (
+      parts.length === 3 &&
+      parts[0] === employee.code &&
+      parts[2] === year &&
+      /^\d+$/.test(parts[1])
+    ) {
+      highest = Math.max(highest,Number(parts[1]));
+    }
+  });
+
+  const counterKey = "b2b-enquiry-counter-"+prefix;
+  const stored = Number(localStorage.getItem(counterKey)) || 0;
+  const serial = Math.max(highest,stored)+1;
+
+  return {
+    number: employee.code+"/"+
+      String(serial).padStart(4,"0")+"/"+year,
+    serial,
+    counterKey
+  };
+}
+
+function updateEnquiryHeader() {
+  const employee = getEmployee(currentEmployeeCode);
+
+  $("enquiryDate").value = enquiryDateDisplay();
+  $("enquiryEmployee").value = employee
+    ? employee.name+" ("+employee.code+")"
+    : "";
+
+  $("enquiryNumber").value =
+    employee ? nextEnquiryNumber().number : "";
+}
+
+    
 function saveOrder() {
   if (!val("oparty")) {
     alert("Please select a customer.");
@@ -708,8 +918,27 @@ function saveOrder() {
   }
 
   const t = totals();
+  
+const employee = getEmployee(currentEmployeeCode);
+
+if (!employee) {
+  alert("Please identify the marketing employee first.");
+  return;
+}
+
+const enquirySequence = nextEnquiryNumber();
+const enquiryDate = new Date();
+
 
   const order = {
+    
+enquiryNumber: enquirySequence.number,
+enquiryDate: enquiryDateDisplay(enquiryDate),
+employeeCode: employee.code,
+employeeName: employee.name,
+documentType: "ENQUIRY",
+status: "Enquiry",
+
     id: crypto.randomUUID(),
     date: new Date().toISOString(),
     party: val("oparty"),
@@ -727,9 +956,22 @@ function saveOrder() {
     freight
   };
 
-  db.orders.push(order);
-  persist();
-  alert("Order saved successfully.");
+ 
+db.orders.push(order);
+persist();
+
+localStorage.setItem(
+  enquirySequence.counterKey,
+  String(enquirySequence.serial)
+);
+
+alert(
+  "Enquiry saved successfully.\n"+
+  "Enquiry No: "+enquirySequence.number
+);
+
+updateEnquiryHeader();
+
 }
 
 function download(name,content,type){
@@ -1178,6 +1420,8 @@ $("orderHistory").innerHTML=db.orders.map((o,i)=>`<div class="panel"><b>Order ${
 addCarton();
 addLine();
 page("home");
+initializeEmployeeLogin();   
+updateEnquiryHeader();
 
 function exportExcel() {
   const sheets = {
