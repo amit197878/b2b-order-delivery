@@ -1,0 +1,1517 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>B2B Order & Delivery</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f3f5fa;color:#17233b}
+header{background:#172b4d;color:white;padding:18px 24px}
+header h2{margin:0 0 7px}
+header small{color:#cbd5e1}
+nav{display:flex;gap:8px;flex-wrap:wrap;background:white;padding:12px;border-bottom:1px solid #ddd}
+button{cursor:pointer;border:0;border-radius:7px;padding:11px 15px;background:#2563eb;color:white}
+nav button{background:#e8edf6;color:#172b4d}
+nav button.active{background:#172b4d;color:white}
+main{max-width:1150px;margin:auto;padding:20px}
+.panel{background:white;border:1px solid #e1e5ed;border-radius:12px;padding:20px;margin-bottom:16px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+label{display:block;font-size:13px;font-weight:bold;margin-bottom:5px}
+input,select,textarea{width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:6px;font:inherit}
+.field{margin-bottom:12px}
+table{width:100%;border-collapse:collapse}
+th,td{padding:10px;border-bottom:1px solid #e5e7eb;text-align:left;font-size:14px}
+th{background:#f1f5f9}
+.scroll{overflow-x:auto}
+.muted{color:#64748b;font-size:13px}
+.total{background:#eff6ff;border-radius:8px;padding:16px;margin:12px 0}
+.small{padding:6px 10px;font-size:12px}
+.danger{background:#b91c1c}
+section{display:none}
+section.active{display:block}
+@media(max-width:600px){main{padding:10px}.panel{padding:13px}nav button{flex:1}}
+</style>
+</head>
+<body>
+  
+<div id="employeeLogin" style="
+  display:none;
+  position:fixed;
+  inset:0;
+  background:#f1f5f9;
+  z-index:9999;
+  align-items:center;
+  justify-content:center;
+  padding:20px;">
+
+  <div class="panel" style="
+    width:100%;
+    max-width:420px;
+    padding:30px;">
+
+    <h2>B2B Enquiry & Delivery Estimator</h2>
+
+    <p class="muted">
+      Employee Identification
+    </p>
+
+    <label>Company-Issued Employee Code</label>
+
+    <input
+      id="employeeCodeInput"
+      placeholder="Example: AS01"
+      maxlength="12"
+      autocomplete="off"
+      style="text-transform:uppercase">
+
+    <p class="muted" style="margin-top:12px">
+      Enter the employee code provided by your company.
+    </p>
+
+    <button onclick="activateEmployee()"
+      style="width:100%">
+      Continue
+    </button>
+
+    <p id="employeeLoginStatus"
+      class="muted"></p>
+
+  </div>
+</div>
+
+<header>
+<h2>B2B Order & Delivery</h2>
+<small>Ex Factory | GST Extra | Freight To-Pay | Local Data</small>
+
+<div style="margin-top:8px;font-size:13px">
+  Employee:
+  <strong id="activeEmployeeDisplay">
+    Not identified
+  </strong>
+</div>
+
+  
+</header>
+<nav id="nav">
+<button onclick="page('home')">Dashboard</button>
+<button onclick="page('items')">Item Master</button>
+<button onclick="page('customers')">Customers</button>
+<button onclick="page('orders')">New Order</button>
+<button onclick="page('history')">Order History</button>
+<button onclick="page('backup')">Backup</button>
+</nav>
+<main>
+<section id="home" class="active">
+<div class="panel">
+<h2>Application Dashboard</h2>
+<p>Welcome to B2B Order & Delivery Management.</p>
+<div class="grid">
+<div class="total"><b id="itemCount">0</b><p>Items</p></div>
+<div class="total"><b id="customerCount">0</b><p>Customers</p></div>
+<div class="total"><b id="orderCount">0</b><p>Orders</p></div>
+</div>
+</div>
+</section>
+
+<section id="items">
+
+<div class="panel" style="background:#f8fafc">
+  <h3>Item Master - Excel Management</h3>
+  <p class="muted">
+    One row per item. Maximum 4 cartons.
+    Dimensions: cm, mm or inch.
+  </p>
+
+  <button onclick="downloadItemTemplate()">
+    Download Excel Template
+  </button>
+
+  <button onclick="exportItemExcel()">
+    Export Item Master
+  </button>
+
+  <div style="margin-top:12px">
+    <label>Import Item Master</label>
+    <input type="file"
+           id="itemExcelFile"
+           accept=".xlsx,.xls,.csv">
+  </div>
+
+  <button onclick="importItemExcel()">
+    Import Excel
+  </button>
+</div>
+
+<div class="panel">
+<h2>Item Master</h2>
+<div class="grid">
+<div class="field"><label>Item Code</label><input id="icode"></div>
+<div class="field"><label>Item Name</label><input id="iname"></div>
+<div class="field"><label>MRP ₹</label><input id="imrp" type="number" min="0"></div>
+</div>
+<h3>Carton Details</h3>
+<p class="muted">Enter gross weight including packing. Each carton can use cm, mm or inch.</p>
+<div id="cartons"></div>
+<button onclick="addCarton()">+ Add Carton</button>
+<div class="total" id="itemSummary"></div>
+<button onclick="saveItem()">Save Item</button>
+</div>
+<div class="panel">
+<h3>Saved Items</h3>
+<div class="scroll"><table><thead><tr><th>Code</th><th>Name</th><th>MRP</th><th>Gross kg</th><th>CBM</th><th>Action</th></tr></thead><tbody id="itemRows"></tbody></table></div>
+</div>
+</section>
+
+<section id="customers">
+<div class="panel">
+<h2>Customer / Party Master</h2>
+
+<div class="panel" style="background:#f8fafc">
+  <h3>Customer Master - Excel Management</h3>
+
+  <p class="muted">
+    Download template, import customers or export saved customers.
+  </p>
+
+  <button onclick="downloadCustomerTemplate()">
+    Download Excel Template
+  </button>
+
+  <button onclick="exportCustomerExcel()">
+    Export Customer Master
+  </button>
+
+  <div style="margin-top:12px">
+    <label>Import Customer Master</label>
+    <input type="file"
+           id="customerExcelFile"
+           accept=".xlsx,.xls">
+  </div>
+
+  <button onclick="importCustomerExcel()">
+    Import Excel
+  </button>
+</div>
+
+  
+<div class="grid">
+<div class="field"><label>Party Name</label><input id="cname"></div>
+<div class="field"><label>Mobile 1</label><input id="cm1"></div>
+<div class="field"><label>Mobile 2</label><input id="cm2"></div>
+<div class="field"><label>Mobile 3</label><input id="cm3"></div>
+<div class="field"><label>GSTIN</label><input id="cgst"></div>
+<div class="field"><label>PIN Code</label><input id="cpin" maxlength="6"></div>
+<div class="field"><label>City / District</label><input id="ccity"></div>
+<div class="field"><label>State</label><input id="cstate"></div>
+</div>
+<div class="field"><label>Complete Address</label><textarea id="caddress"></textarea></div>
+<button onclick="lookupPin()">Check PIN Code</button>
+<select id="locality" style="margin:10px 0" onchange="chooseLocality()">
+<option value="">Select locality if available</option>
+</select>
+<p class="muted" id="pinStatus"></p>
+<button id="customerSaveButton" onclick="saveCustomer()">
+  Save Customer
+</button>
+<button type="button" onclick="clearCustomerForm()">
+  Clear / New Customer
+</button>
+</div>
+<div class="panel">
+<h3>Saved Customers</h3>
+<div class="scroll"><table><tbody id="customerRows"></tbody></table></div>
+</div>
+</section>
+
+<section id="orders">
+<div class="panel">
+
+<h2>New B2B Enquiry</h2>
+
+<div class="grid">
+  <div class="field">
+    <label>Enquiry Number (Automatic)</label>
+    <input id="enquiryNumber" readonly
+      placeholder="Generated on Save">
+  </div>
+
+  <div class="field">
+    <label>Enquiry Date</label>
+    <input id="enquiryDate" readonly>
+  </div>
+
+  <div class="field">
+    <label>Marketing Person</label>
+    <input id="enquiryEmployee" readonly>
+  </div>
+</div>
+
+<div class="field"><label>Customer</label><select id="oparty"></select></div>
+<h3>Order Items</h3>
+<div id="orderLines"></div>
+<button onclick="addLine()">+ Add Item</button>
+  
+<div class="panel" style="background:#f8fafc;margin-top:16px">
+  <h3>Packing & Shipment Summary</h3>
+
+  <div class="grid">
+    <div class="total">
+      <b id="totalOrderCartons">0</b>
+      <p>Total Cartons</p>
+    </div>
+
+    <div class="total">
+      <b id="totalOrderWeight">0.00 kg</b>
+      <p>Total Gross Weight</p>
+    </div>
+
+    <div class="total">
+      <b id="totalOrderCBM">0.0000</b>
+      <p>Total CBM</p>
+    </div>
+  </div>
+</div>
+
+<div class="grid" style="margin-top:18px">
+
+<div class="field"><label>Delivery Partner</label><input id="otransport" placeholder="Transporter name"></div>
+<div class="field"><label>Delivery Type</label><select id="oservice"><option>Surface</option><option>Express</option><option>Air</option></select></div>
+<div class="field"><label>Estimated Freight ₹ (To-Pay)</label><input id="ofreight" type="number" min="0" value="0" oninput="calculate()"></div>
+</div>
+<div class="total" id="orderSummary"></div>
+<button onclick="saveOrder()">Save Order</button>
+</div>
+</section>
+
+<section id="history">
+<div class="panel"><h2>Order History</h2><div id="orderHistory"></div></div>
+</section>
+
+<section id="backup">
+<div class="panel">
+<h2>Backup & Restore</h2>
+<p>Export your local items, customers and orders regularly.</p>
+<button onclick="backup()">Download JSON Backup</button>
+<button onclick="exportExcel()">
+  Download All Data - Excel
+</button>
+<h3>Restore Backup</h3>
+<input type="file" accept=".json" id="restoreFile">
+<button onclick="restore()">Restore</button>
+<p class="muted">Restoring replaces the current local records. Keep a backup first.</p>
+</div>
+</section>
+</main>
+
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+  <script>
+const KEY="b2b-order-v1";
+let db;
+try{
+db=JSON.parse(localStorage.getItem(KEY))||{};
+}catch(e){db={}}
+db.items ||= [];
+db.customers ||= [];
+db.orders ||= [];
+    
+/* Employee Master - Company Controlled */
+const EMPLOYEE_MASTER = [
+  {code:"AS01", name:"Amit Singhal", active:true}
+];
+
+/* Employee identification */
+const EMPLOYEE_KEY = "b2b-employee-v1";
+let currentEmployeeCode =
+  localStorage.getItem(EMPLOYEE_KEY) || "";
+
+function getEmployee(code) {
+  return EMPLOYEE_MASTER.find(e =>
+    e.code === String(code).trim().toUpperCase() &&
+    e.active === true
+  );
+}
+
+function saveEmployeeCode(code) {
+  const employee = getEmployee(code);
+
+  if (!employee) {
+    alert("Invalid employee code. Contact your company.");
+    return false;
+  }
+
+  currentEmployeeCode = employee.code;
+  localStorage.setItem(EMPLOYEE_KEY, employee.code);
+  return true;
+}
+
+    
+function activateEmployee() {
+  const code = $("employeeCodeInput").value
+    .trim().toUpperCase();
+
+  if (!saveEmployeeCode(code)) {
+    $("employeeLoginStatus").textContent =
+      "Employee code not found in Company Master.";
+    return;
+  }
+
+  $("employeeLogin").style.display = "none";
+  updateEmployeeDisplay();
+}
+
+function updateEmployeeDisplay() {
+  const el = $("activeEmployeeDisplay");
+  if (!el) return;
+
+  const employee = getEmployee(currentEmployeeCode);
+
+  el.textContent = employee
+    ? employee.name + " (" + employee.code + ")"
+    : "Employee not identified";
+}
+
+function initializeEmployeeLogin() {
+  const employee = getEmployee(currentEmployeeCode);
+
+  if (!employee) {
+    currentEmployeeCode = "";
+    $("employeeLogin").style.display = "flex";
+  } else {
+    $("employeeLogin").style.display = "none";
+  }
+
+  updateEmployeeDisplay();
+  updateEnquiryHeader();
+}
+
+
+let editingCustomerId = null; 
+let cartons=[];
+let lines=[];
+const $=id=>document.getElementById(id);
+const val=id=>$(id).value;
+const money=n=>"₹"+Number(n||0).toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2});
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+function persist(){localStorage.setItem(KEY,JSON.stringify(db));render()}
+function page(id){
+document.querySelectorAll("section").forEach(x=>x.classList.toggle("active",x.id===id));
+document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("active",b.getAttribute("onclick")==="page('"+id+"')"));
+render();
+}
+function addCarton(c){
+cartons.push(c||{name:"Carton",qty:1,l:0,w:0,h:0,unit:"cm",gross:0});
+renderCartons();
+}
+function cartonVolume(c){
+let f={cm:1,mm:.1,inch:2.54}[c.unit]||1;
+return Number(c.l)*Number(c.w)*Number(c.h)*Math.pow(f,3)*Number(c.qty)/1000000;
+}
+function renderCartons(){
+$("cartons").innerHTML=cartons.map((c,i)=>`
+<div class="panel" style="background:#f8fafc">
+<b>Carton ${i+1}</b>
+<div class="grid">
+${[["name","Carton Name","text"],["qty","Carton Qty","number"],["l","Length","number"],["w","Width","number"],["h","Height","number"],["gross","Gross Weight kg / Carton","number"]].map(([k,label,type])=>`
+<div class="field"><label>${label}</label><input type="${type}" value="${esc(c[k])}" onchange="cartonChange(${i},'${k}',this.value)"></div>`).join("")}
+<div class="field"><label>Unit</label><select onchange="cartonChange(${i},'unit',this.value)">
+${["cm","mm","inch"].map(u=>`<option ${c.unit===u?"selected":""}>${u}</option>`).join("")}
+</select></div></div>
+<p>CBM: ${cartonVolume(c).toFixed(4)}</p>
+<button class="small danger" onclick="cartons.splice(${i},1);renderCartons()">Remove</button>
+</div>`).join("");
+$("itemSummary").textContent="Total CBM: "+cartons.reduce((s,c)=>s+cartonVolume(c),0).toFixed(4)+" | Total Gross Weight: "+cartons.reduce((s,c)=>s+Number(c.gross)*Number(c.qty),0).toFixed(2)+" kg";
+}
+function cartonChange(i,k,v){
+cartons[i][k]=k==="name"||k==="unit"?v:Number(v);
+renderCartons();
+}
+function saveItem(){
+let code=val("icode").trim();
+if(!code||!val("iname").trim()||Number(val("imrp"))<0||!cartons.length||cartons.some(c=>!c.l||!c.w||!c.h||!c.qty||Number(c.gross)<0)){alert("Enter valid item and carton details");return}
+let item={code,name:val("iname"),mrp:Number(val("imrp")),cartons:structuredClone(cartons)};
+let i=db.items.findIndex(x=>x.code===code);
+if(i>=0)db.items[i]=item;else db.items.push(item);
+persist();alert("Item saved");
+}
+function editItem(code){
+let x=db.items.find(a=>a.code===code);
+if(!x)return;
+$("icode").value=x.code;$("iname").value=x.name;$("imrp").value=x.mrp;
+cartons=structuredClone(x.cartons);renderCartons();page("items");
+}
+async function lookupPin(){
+let p=val("cpin").trim();
+if(!/^\d{6}$/.test(p)){alert("Enter valid six-digit PIN");return}
+$("pinStatus").textContent="Looking up PIN...";
+try{
+let r=await fetch("https://api.postalpincode.in/pincode/"+p);
+let data=await r.json();
+let offices=data[0]?.PostOffice||[];
+if(!offices.length)throw Error("PIN not found");
+window.pinOffices=offices;
+$("locality").innerHTML=offices.map((o,i)=>`<option value="${i}">${esc(o.Name)}</option>`).join("");
+chooseLocality();
+$("pinStatus").textContent="PIN details found. Please verify the delivery address.";
+}catch(e){$("pinStatus").textContent="Lookup unavailable. Enter address manually."}
+}
+function chooseLocality(){
+let o=window.pinOffices?.[Number(val("locality"))];
+if(o){$("ccity").value=o.District;$("cstate").value=o.State}
+}
+
+function editCustomer(id) {
+  const c = db.customers.find(x => x.id === id);
+
+  if (!c) {
+    alert("Customer not found.");
+    return;
+  }
+
+  editingCustomerId = id;
+
+  $("cname").value = c.name || "";
+  $("caddress").value = c.address || "";
+  $("ccity").value = c.city || "";
+  $("cstate").value = c.state || "";
+  $("cpin").value = c.pin || "";
+
+  $("cm1").value = c.mobile?.[0] || "";
+  $("cm2").value = c.mobile?.[1] || "";
+  $("cm3").value = c.mobile?.[2] || "";
+
+  $("cgst").value = c.gstin || "";
+
+  $("customerSaveButton").textContent = "Update Customer";
+
+  page("customers");
+  window.scrollTo({top:0,behavior:"smooth"});
+}
+
+function clearCustomerForm() {
+  editingCustomerId = null;
+
+  ["cname","caddress","ccity","cstate",
+   "cpin","cm1","cm2","cm3","cgst"].forEach(id => {
+    $(id).value = "";
+  });
+
+  $("customerSaveButton").textContent = "Save Customer";
+  $("pinStatus").textContent = "";
+  $("locality").innerHTML =
+    '<option value="">Select locality if available</option>';
+}
+    
+
+function saveCustomer() {
+  const name = val("cname").trim();
+  const pin = val("cpin").trim();
+
+  if (!name || !/^\d{6}$/.test(pin)) {
+    alert("Enter Party Name and a valid 6-digit PIN Code.");
+    return;
+  }
+
+  const duplicate = db.customers.find(c =>
+    c.id !== editingCustomerId &&
+    c.name.trim().toLowerCase() === name.toLowerCase() &&
+    String(c.pin) === pin
+  );
+
+  if (duplicate) {
+    alert("A customer with this Party Name and PIN already exists.");
+    return;
+  }
+
+  const record = {
+    id: editingCustomerId || crypto.randomUUID(),
+    name,
+    address: val("caddress").trim(),
+    city: val("ccity").trim(),
+    state: val("cstate").trim(),
+    pin,
+    mobile: [val("cm1"),val("cm2"),val("cm3")],
+    gstin: val("cgst").trim().toUpperCase()
+  };
+
+  if (editingCustomerId) {
+    const index = db.customers.findIndex(
+      c => c.id === editingCustomerId
+    );
+
+    if (index === -1) {
+      alert("Customer no longer exists.");
+      return;
+    }
+
+    db.customers[index] = record;
+  } else {
+    db.customers.push(record);
+  }
+
+  persist();
+  clearCustomerForm();
+  alert("Customer saved successfully.");
+}
+
+
+function addLine() {
+  lines.push({
+    code: db.items[0]?.code || "",
+    qty: 1,
+    discount: 0
+  });
+  renderLines();
+}
+
+function renderLines() {
+  $("orderLines").innerHTML = `
+    <div class="scroll">
+      <table style="min-width:1150px">
+        <thead>
+          <tr>
+            <th>Item Code / Name</th>
+            <th>Qty</th>
+            <th>MRP</th>
+            <th>Disc. %</th>
+            <th>Selling Price</th>
+            <th>Item Value</th>
+            <th>Cartons</th>
+            <th>Gross kg</th>
+            <th>CBM</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${lines.map((line,i) => {
+            const item = db.items.find(
+              x => x.code === line.code
+            );
+            const qty = Number(line.qty) || 0;
+            const discount = Number(line.discount) || 0;
+            const mrp = Number(item?.mrp) || 0;
+            const selling = mrp*(1-discount/100);
+            const cartons = item?.cartons || [];
+
+            const cartonCount = cartons.reduce(
+              (s,c) => s+Number(c.qty || 1),0
+            )*qty;
+
+            const weight = cartons.reduce(
+              (s,c) => s+
+              Number(c.gross)*Number(c.qty || 1),0
+            )*qty;
+
+            const cbm = cartons.reduce(
+              (s,c) => s+cartonVolume(c),0
+            )*qty;
+
+            return `
+              <tr>
+                <td>
+                  <select
+                    onchange="updateOrderLine(${i},'code',this.value)">
+                    ${db.items.map(x => `
+                      <option value="${esc(x.code)}"
+                        ${line.code===x.code?"selected":""}>
+                        ${esc(x.code)} - ${esc(x.name)}
+                      </option>
+                    `).join("")}
+                  </select>
+                </td>
+
+                <td>
+                  <input type="number" min="1" step="1"
+                    value="${qty}"
+                    onchange="updateOrderLine(${i},'qty',this.value)"
+                    style="min-width:65px">
+                </td>
+
+                <td>${money(mrp)}</td>
+
+                <td>
+                  <input type="number" min="0" max="100"
+                    step="0.01" value="${discount}"
+                    onchange="updateOrderLine(${i},'discount',this.value)"
+                    style="min-width:75px">
+                </td>
+
+                <td>${money(selling)}</td>
+                <td><b>${money(selling*qty)}</b></td>
+                <td>${cartonCount}</td>
+                <td>${weight.toFixed(2)}</td>
+                <td>${cbm.toFixed(4)}</td>
+
+                <td>
+                  <button class="small danger"
+                    onclick="removeOrderLine(${i})">
+                    Remove
+                  </button>
+                </td>
+              </tr>
+
+              <tr>
+                <td colspan="10">
+                  <details>
+                    <summary style="cursor:pointer">
+                      View Carton Details
+                    </summary>
+                    <div class="scroll">
+                      <table>
+                        <thead>
+                          <tr>
+                            <th>Carton</th>
+                            <th>Qty in Order</th>
+                            <th>Length</th>
+                            <th>Width</th>
+                            <th>Height</th>
+                            <th>Unit</th>
+                            <th>Gross kg</th>
+                            <th>Total CBM</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          ${cartons.map((c,j) => `
+                            <tr>
+                              <td>${esc(c.name || "Carton "+(j+1))}</td>
+                              <td>${Number(c.qty || 1)*qty}</td>
+                              <td>${Number(c.l)}</td>
+                              <td>${Number(c.w)}</td>
+                              <td>${Number(c.h)}</td>
+                              <td>${esc(c.unit)}</td>
+                              <td>${(
+                                Number(c.gross)*
+                                Number(c.qty || 1)*qty
+                              ).toFixed(2)}</td>
+                              <td>${(
+                                cartonVolume(c)*qty
+                              ).toFixed(4)}</td>
+                            </tr>
+                          `).join("")}
+                        </tbody>
+                      </table>
+                    </div>
+                  </details>
+                </td>
+              </tr>
+            `;
+          }).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+  calculate();
+}
+
+function updateOrderLine(index,field,value) {
+  if (!lines[index]) return;
+
+  if (field === "code") {
+    lines[index].code = value;
+  } else if (field === "qty") {
+    const n = Number(value);
+    if (!Number.isInteger(n) || n < 1) {
+      alert("Quantity must be a positive whole number.");
+      renderLines();
+      return;
+    }
+    lines[index].qty = n;
+  } else if (field === "discount") {
+    const n = Number(value);
+    if (!Number.isFinite(n) || n < 0 || n > 100) {
+      alert("Discount must be between 0 and 100%.");
+      renderLines();
+      return;
+    }
+    lines[index].discount = n;
+  }
+
+  renderLines();
+}
+
+function removeOrderLine(index) {
+  lines.splice(index,1);
+  renderLines();
+}
+
+function totals() {
+  let mrp = 0;
+  let taxable = 0;
+  let totalCartons = 0;
+  let totalWeight = 0;
+  let totalCBM = 0;
+
+  const details = lines.map(line => {
+    const item = db.items.find(
+      x => x.code === line.code
+    );
+    if (!item) return null;
+
+    const qty = Number(line.qty);
+    const discount = Number(line.discount || 0);
+    const unitMRP = Number(item.mrp);
+    const sellingPrice = unitMRP*(1-discount/100);
+    const itemValue = sellingPrice*qty;
+
+    const cartonsPerItem = item.cartons.reduce(
+      (s,c) => s+Number(c.qty || 1),0
+    );
+    const weightPerItem = item.cartons.reduce(
+      (s,c) => s+
+      Number(c.gross)*Number(c.qty || 1),0
+    );
+    const cbmPerItem = item.cartons.reduce(
+      (s,c) => s+cartonVolume(c),0
+    );
+
+    mrp += unitMRP*qty;
+    taxable += itemValue;
+    totalCartons += cartonsPerItem*qty;
+    totalWeight += weightPerItem*qty;
+    totalCBM += cbmPerItem*qty;
+
+    return {
+      code:item.code,
+      name:item.name,
+      qty,discount,
+      mrp:unitMRP,
+      sellingPrice,
+      itemValue,
+      cartons:cartonsPerItem*qty,
+      grossWeight:weightPerItem*qty,
+      cbm:cbmPerItem*qty
+    };
+  }).filter(Boolean);
+
+  const gst = taxable*0.18;
+
+  return {
+    mrp,
+    discountAmount:mrp-taxable,
+    taxable,
+    gst,
+    total:taxable+gst,
+    totalCartons,
+    totalWeight,
+    totalCBM,
+    details
+  };
+}
+
+function calculate() {
+  const t = totals();
+
+  $("totalOrderCartons").textContent =
+    t.totalCartons;
+
+  $("totalOrderWeight").textContent =
+    t.totalWeight.toFixed(2)+" kg";
+
+  $("totalOrderCBM").textContent =
+    t.totalCBM.toFixed(4);
+
+  $("orderSummary").innerHTML = `
+    <b>Order Pricing Summary</b>
+    <p>Total MRP: ${money(t.mrp)}</p>
+    <p>Total Discount: ${money(t.discountAmount)}</p>
+    <p>Ex Factory Value: ${money(t.taxable)}</p>
+    <p>GST 18%: ${money(t.gst)}</p>
+    <hr>
+    <h3>Customer Order Value: ${money(t.total)}</h3>
+    <p>
+      Estimated Freight To-Pay:
+      ${money(Math.max(0,Number(val("ofreight"))||0))}
+    </p>
+    <p class="muted">
+      Freight is payable directly to the transporter.
+      It is not included in the seller order total.
+    </p>
+  `;
+}
+
+
+function enquiryYear(date = new Date()) {
+  return String(date.getFullYear()).slice(-2);
+}
+
+function enquiryDateDisplay(date = new Date()) {
+  const d = String(date.getDate()).padStart(2,"0");
+  const m = String(date.getMonth()+1).padStart(2,"0");
+  return d+"-"+m+"-"+date.getFullYear();
+}
+
+function nextEnquiryNumber() {
+  const employee = getEmployee(currentEmployeeCode);
+
+  if (!employee) {
+    throw new Error("Employee identification required.");
+  }
+
+  const year = enquiryYear();
+  const prefix = employee.code+"/"+year;
+
+  // Find the highest saved serial for this employee and year.
+  let highest = 0;
+
+  db.orders.forEach(order => {
+    const number = String(order.enquiryNumber || "");
+    const parts = number.split("/");
+
+    if (
+      parts.length === 3 &&
+      parts[0] === employee.code &&
+      parts[2] === year &&
+      /^\d+$/.test(parts[1])
+    ) {
+      highest = Math.max(highest,Number(parts[1]));
+    }
+  });
+
+  const counterKey = "b2b-enquiry-counter-"+prefix;
+  const stored = Number(localStorage.getItem(counterKey)) || 0;
+  const serial = Math.max(highest,stored)+1;
+
+  return {
+    number: employee.code+"/"+
+      String(serial).padStart(4,"0")+"/"+year,
+    serial,
+    counterKey
+  };
+}
+
+function updateEnquiryHeader() {
+  const employee = getEmployee(currentEmployeeCode);
+
+  $("enquiryDate").value = enquiryDateDisplay();
+  $("enquiryEmployee").value = employee
+    ? employee.name+" ("+employee.code+")"
+    : "";
+
+  $("enquiryNumber").value =
+    employee ? nextEnquiryNumber().number : "";
+}
+
+    
+function saveOrder() {
+  if (!val("oparty")) {
+    alert("Please select a customer.");
+    return;
+  }
+
+  if (!lines.length || lines.some(l =>
+    !db.items.some(x=>x.code===l.code) ||
+    !Number.isInteger(Number(l.qty)) ||
+    Number(l.qty)<1 ||
+    !Number.isFinite(Number(l.discount)) ||
+    Number(l.discount)<0 ||
+    Number(l.discount)>100
+  )) {
+    alert("Please check item quantities and discounts.");
+    return;
+  }
+
+  const freight = Number(val("ofreight"));
+  if (!Number.isFinite(freight) || freight < 0) {
+    alert("Enter a valid non-negative freight amount.");
+    return;
+  }
+
+  const t = totals();
+  
+const employee = getEmployee(currentEmployeeCode);
+
+if (!employee) {
+  alert("Please identify the marketing employee first.");
+  return;
+}
+
+const enquirySequence = nextEnquiryNumber();
+const enquiryDate = new Date();
+
+
+  const order = {
+    
+enquiryNumber: enquirySequence.number,
+enquiryDate: enquiryDateDisplay(enquiryDate),
+employeeCode: employee.code,
+employeeName: employee.name,
+documentType: "ENQUIRY",
+status: "Enquiry",
+
+    id: crypto.randomUUID(),
+    date: new Date().toISOString(),
+    party: val("oparty"),
+    lines: lines.map(l => ({
+      code:l.code,
+      qty:Number(l.qty),
+      discount:Number(l.discount || 0),
+      item:structuredClone(
+        db.items.find(x=>x.code===l.code)
+      )
+    })),
+    totals:t,
+    transport:val("otransport").trim(),
+    service:val("oservice"),
+    freight
+  };
+
+ 
+db.orders.push(order);
+persist();
+
+localStorage.setItem(
+  enquirySequence.counterKey,
+  String(enquirySequence.serial)
+);
+
+alert(
+  "Enquiry saved successfully.\n"+
+  "Enquiry No: "+enquirySequence.number
+);
+
+updateEnquiryHeader();
+
+}
+
+function download(name,content,type){
+let a=document.createElement("a"),url=URL.createObjectURL(new Blob([content],{type}));
+a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+
+
+const ITEM_HEADERS = [
+  "Item Code", "Item Name", "MRP", "No. of Cartons", "Unit",
+  ...[1,2,3,4].flatMap(n => [
+    `Carton ${n} Length`,
+    `Carton ${n} Width`,
+    `Carton ${n} Height`,
+    `Carton ${n} Gross Weight`
+  ]),
+  "Total CBM", "Total Gross Weight"
+];
+
+function makeItemWorkbook(items, template=false) {
+  if (!window.XLSX) {
+    alert("Excel library not loaded. Check internet connection.");
+    return;
+  }
+
+  const rows = items.map(item => {
+    const cs = (item.cartons || []).slice(0,4);
+    const unit = cs[0]?.unit || "cm";
+    const cells = [];
+
+    for (let i=0;i<4;i++) {
+      const c=cs[i];
+      cells.push(
+        c?.l ?? "",
+        c?.w ?? "",
+        c?.h ?? "",
+        c?.gross ?? ""
+      );
+    }
+
+    return [
+      item.code,
+      item.name,
+      item.mrp,
+      cs.length,
+      unit,
+      ...cells,
+      cs.reduce((s,c)=>s+cartonVolume(c),0),
+      cs.reduce((s,c)=>s+Number(c.gross)*Number(c.qty||1),0)
+    ];
+  });
+
+  const ws = XLSX.utils.aoa_to_sheet([ITEM_HEADERS,...rows]);
+  ws["!cols"] = ITEM_HEADERS.map((h,i)=>({
+    wch:i===1?28:i===0?20:18
+  }));
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,"Item Master");
+
+  XLSX.writeFile(
+    wb,
+    template ? "Item_Master_Template.xlsx" : "Item_Master_Export.xlsx"
+  );
+}
+
+function downloadItemTemplate() {
+  makeItemWorkbook([], true);
+}
+function exportItemExcel() {
+  makeItemWorkbook(db.items);
+}
+
+async function importItemExcel() {
+  const file = document.getElementById("itemExcelFile").files[0];
+
+  if (!file) {
+    alert("Please select an Excel file.");
+    return;
+  }
+
+  if (!window.XLSX) {
+    alert("Excel library is not available.");
+    return;
+  }
+
+  try {
+    const data = await file.arrayBuffer();
+    const wb = XLSX.read(data,{type:"array"});
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws,{
+      header:1,defval:""
+    });
+
+    if (JSON.stringify(rows[0]) !== JSON.stringify(ITEM_HEADERS)) {
+      alert("Excel columns do not match the approved Item Master template.");
+      return;
+    }
+
+    const imported=[];
+    const errors=[];
+
+  rows.slice(1).forEach((r,index)=>{
+  // Skip rows without an Item Code, even if formula cells contain zero.
+  if (!String(r[0] ?? "").trim()) return;
+
+      const code=String(r[0]).trim();
+      const name=String(r[1]).trim();
+      const mrp=Number(r[2]);
+      const count=Number(r[3]);
+      const unit=String(r[4]).trim().toLowerCase();
+
+      if (!/^[a-zA-Z0-9 /-]+$/.test(code) ||
+          !name || !Number.isFinite(mrp) || mrp<0 ||
+          !Number.isInteger(count) || count<1 || count>4 ||
+          !["cm","mm","inch"].includes(unit)) {
+        errors.push(index+2);
+        return;
+      }
+
+      const cs=[];
+      let valid=true;
+
+      for(let i=0;i<count;i++){
+        const base=5+i*4;
+        const l=Number(r[base]);
+        const w=Number(r[base+1]);
+        const h=Number(r[base+2]);
+        const gross=Number(r[base+3]);
+
+        if (![l,w,h,gross].every(Number.isFinite) ||
+            l<=0 || w<=0 || h<=0 || gross<0) {
+          valid=false;
+          break;
+        }
+
+        cs.push({
+          name:"Carton "+(i+1),
+          qty:1,l,w,h,gross,unit
+        });
+      }
+
+      if(!valid){
+        errors.push(index+2);
+        return;
+      }
+
+      imported.push({code,name,mrp,cartons:cs});
+    });
+
+   
+if (errors.length) {
+  const details = errors.map(rowNumber => {
+    const row = rows[rowNumber - 1] || [];
+    return "Row " + rowNumber +
+      " | Item Code: " + JSON.stringify(row[0]) +
+      " | Name: " + JSON.stringify(row[1]) +
+      " | MRP: " + JSON.stringify(row[2]) +
+      " | Cartons: " + JSON.stringify(row[3]) +
+      " | Unit: " + JSON.stringify(row[4]);
+  });
+
+  console.error("Excel import errors:", details);
+  alert("Import stopped. First errors:\n" +
+        details.slice(0, 5).join("\n"));
+  return;
+}
+
+
+    if(!imported.length){
+      alert("No items found.");
+      return;
+    }
+
+    if(!confirm(
+      "Import "+imported.length+
+      " items? Matching Item Codes will be updated."
+    )) return;
+
+    imported.forEach(item=>{
+      const i=db.items.findIndex(x=>x.code===item.code);
+      if(i>=0) db.items[i]=item;
+      else db.items.push(item);
+    });
+
+    persist();
+    alert(imported.length+" items imported successfully.");
+
+  }catch(e){
+    alert("Unable to read Excel file: "+e.message);
+  }
+}
+   
+
+const CUSTOMER_HEADERS = [
+  "Party Name",
+  "Complete Address",
+  "City",
+  "State",
+  "PIN Code",
+  "Mobile 1",
+  "Mobile 2",
+  "Mobile 3",
+  "GSTIN"
+];
+
+function makeCustomerWorkbook(customers, template=false) {
+  if (!window.XLSX) {
+    alert("Excel library not loaded. Check internet connection.");
+    return;
+  }
+
+  const rows = customers.map(c => [
+    c.name || "",
+    c.address || "",
+    c.city || "",
+    c.state || "",
+    String(c.pin || ""),
+    String(c.mobile?.[0] || ""),
+    String(c.mobile?.[1] || ""),
+    String(c.mobile?.[2] || ""),
+    c.gstin || ""
+  ]);
+
+  const ws = XLSX.utils.aoa_to_sheet([
+    CUSTOMER_HEADERS,
+    ...rows
+  ]);
+
+  ws["!cols"] = [
+    {wch:30}, {wch:45}, {wch:22},
+    {wch:22}, {wch:15}, {wch:18},
+    {wch:18}, {wch:18}, {wch:22}
+  ];
+
+  // Keep PIN and mobile numbers as text.
+  for (let r=1;r<=rows.length;r++) {
+    for (const col of ["E","F","G","H"]) {
+      const cell=ws[col+(r+1)];
+      if (cell) {
+        cell.t="s";
+        cell.v=String(cell.v ?? "");
+      }
+    }
+  }
+
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(
+    wb,ws,"Customer Master"
+  );
+
+  XLSX.writeFile(
+    wb,
+    template
+      ? "Customer_Master_Template.xlsx"
+      : "Customer_Master_Export.xlsx"
+  );
+}
+
+function downloadCustomerTemplate() {
+  makeCustomerWorkbook([],true);
+}
+
+function exportCustomerExcel() {
+  makeCustomerWorkbook(db.customers);
+}
+
+async function importCustomerExcel() {
+  const file=document.getElementById(
+    "customerExcelFile"
+  ).files[0];
+
+  if (!file) {
+    alert("Please select a Customer Master Excel file.");
+    return;
+  }
+
+  if (!window.XLSX) {
+    alert("Excel library is not available.");
+    return;
+  }
+
+  try {
+    const buffer=await file.arrayBuffer();
+    const wb=XLSX.read(buffer,{type:"array"});
+    const ws=wb.Sheets[wb.SheetNames[0]];
+
+    const rows=XLSX.utils.sheet_to_json(ws,{
+      header:1,
+      defval:"",
+      raw:false
+    });
+
+    const headers=rows[0] || [];
+
+    if (JSON.stringify(headers) !==
+        JSON.stringify(CUSTOMER_HEADERS)) {
+      alert("Excel columns do not match the Customer Master template.");
+      return;
+    }
+
+    const imported=[];
+    const errors=[];
+    const seen=new Set();
+
+    rows.slice(1).forEach((r,index)=>{
+      const name=String(r[0] ?? "").trim();
+
+      // Ignore blank template rows.
+      if (!name) return;
+
+      const address=String(r[1] ?? "").trim();
+      const city=String(r[2] ?? "").trim();
+      const state=String(r[3] ?? "").trim();
+      const pin=String(r[4] ?? "").trim();
+
+      const mobiles=[
+        String(r[5] ?? "").trim(),
+        String(r[6] ?? "").trim(),
+        String(r[7] ?? "").trim()
+      ];
+
+      const gstin=String(r[8] ?? "")
+        .trim().toUpperCase();
+
+      const key=name.toLowerCase()+"|"+pin;
+
+      if (!city || !state ||
+          !/^\d{6}$/.test(pin) ||
+          mobiles.some(m=>m && !/^\d{10}$/.test(m)) ||
+          (gstin && !/^[0-9A-Z]{15}$/.test(gstin)) ||
+          seen.has(key)) {
+        errors.push(index+2);
+        return;
+      }
+
+      seen.add(key);
+
+      imported.push({
+        id:crypto.randomUUID(),
+        name,address,city,state,pin,
+        mobile:mobiles,gstin
+      });
+    });
+
+    if (errors.length) {
+      alert(
+        "Import stopped. Check Excel rows: "+
+        errors.join(", ")
+      );
+      return;
+    }
+
+    if (!imported.length) {
+      alert("No customers found in Excel.");
+      return;
+    }
+
+    const newCustomers=[];
+    const duplicates=[];
+
+    imported.forEach(c=>{
+      const existing=db.customers.find(x=>
+        x.name.trim().toLowerCase()===
+          c.name.toLowerCase() &&
+        String(x.pin)===c.pin
+      );
+
+      if (existing) duplicates.push(c.name);
+      else newCustomers.push(c);
+    });
+
+    const message=
+      "New customers: "+newCustomers.length+
+      "\nExisting customers skipped: "+duplicates.length+
+      "\n\nImport new customers?";
+
+    if (!confirm(message)) return;
+
+    // Add new customers only.
+    // Existing customer records remain unchanged.
+    db.customers.push(...newCustomers);
+
+    persist();
+
+    alert(
+      newCustomers.length+
+      " customers imported successfully.\n"+
+      duplicates.length+
+      " existing customers skipped."
+    );
+
+  } catch(e) {
+    alert("Unable to read Excel file: "+e.message);
+  }
+}
+   
+    
+    
+    function backup(){download("b2b-backup.json",JSON.stringify(db,null,2),"application/json")}
+async function restore(){
+let f=$("restoreFile").files[0];if(!f)return;
+try{
+let d=JSON.parse(await f.text());
+if(!Array.isArray(d.items)||!Array.isArray(d.customers)||!Array.isArray(d.orders))throw Error();
+if(!confirm("Replace all current local records with this backup?"))return;
+db=d;persist();alert("Backup restored");
+}catch(e){alert("Invalid backup file")}
+}
+function render(){
+$("itemCount").textContent=db.items.length;
+$("customerCount").textContent=db.customers.length;
+$("orderCount").textContent=db.orders.length;
+$("itemRows").innerHTML=db.items.map(x=>`<tr><td>${esc(x.code)}</td><td>${esc(x.name)}</td><td>${money(x.mrp)}</td><td>${x.cartons.reduce((s,c)=>s+Number(c.gross)*Number(c.qty),0).toFixed(2)}</td><td>${x.cartons.reduce((s,c)=>s+cartonVolume(c),0).toFixed(4)}</td><td><button class="small" onclick="editItem('${esc(x.code)}')">Edit</button></td></tr>`).join("");
+
+$("customerRows").innerHTML = `
+<tr style="background:#f1f5f9">
+  <th>Party Name</th>
+  <th>City</th>
+  <th>State</th>
+  <th>PIN Code</th>
+  <th>Mobile 1</th>
+  <th>GSTIN</th>
+  <th>Action</th>
+</tr>
+` + db.customers.map(c => `
+<tr>
+  <td>${esc(c.name)}</td>
+  <td>${esc(c.city)}</td>
+  <td>${esc(c.state)}</td>
+  <td>${esc(c.pin)}</td>
+  <td>${esc(c.mobile?.[0] || "")}</td>
+  <td>${esc(c.gstin || "")}</td>
+  <td>
+    <button class="small"
+      onclick="editCustomer('${c.id}')">
+      Edit
+    </button>
+  </td>
+</tr>
+`).join("");
+
+$("oparty").innerHTML=db.customers.map(x=>`<option value="${esc(x.id)}">${esc(x.name)}</option>`).join("");
+$("orderHistory").innerHTML=db.orders.map((o,i)=>`<div class="panel"><b>Order ${i+1}</b><p>${esc(db.customers.find(c=>c.id===o.party)?.name||"Customer")}</p><p>${money(o.totals.total)} | To-Pay freight ${money(o.freight)}</p><button onclick="download('order-${i+1}.json',JSON.stringify(db.orders[${i}],null,2),'application/json')">Export JSON</button></div>`).join("");
+}
+addCarton();
+addLine();
+page("home");
+initializeEmployeeLogin();   
+updateEnquiryHeader();
+
+function exportExcel() {
+  const sheets = {
+    "Item Master": [
+      ["Item Code","Item Name","MRP","Total Gross kg","Total CBM"],
+      ...db.items.map(x => [
+        x.code, x.name, x.mrp,
+        x.cartons.reduce((s,c) =>
+          s + Number(c.gross)*Number(c.qty),0),
+        x.cartons.reduce((s,c) => s + cartonVolume(c),0)
+      ])
+    ],
+    "Carton Details": [
+      ["Item Code","Carton Name","Qty","Length","Width",
+       "Height","Unit","Gross kg / Carton","Total CBM"],
+      ...db.items.flatMap(x => x.cartons.map(c => [
+        x.code,c.name,c.qty,c.l,c.w,c.h,c.unit,
+        c.gross,cartonVolume(c)
+      ]))
+    ],
+    "Customer Master": [
+      ["Party Name","Address","City","State","PIN",
+       "Mobile 1","Mobile 2","Mobile 3","GSTIN"],
+      ...db.customers.map(x => [
+        x.name,x.address,x.city,x.state,x.pin,
+        ...(x.mobile || []).concat(["","",""]).slice(0,3),
+        x.gstin
+      ])
+    ],
+    "Order Master": [
+      ["Order ID","Date","Customer ID","Discount %",
+       "Ex Factory","GST","Seller Total","Transporter",
+       "Service","To-Pay Freight"],
+      ...db.orders.map(o => [
+        o.id,o.date,o.party,o.discount,
+        o.totals.taxable,o.totals.gst,o.totals.total,
+        o.transport,o.service,o.freight
+      ])
+    ],
+    "Order Items": [
+      ["Order ID","Item Code","Item Name","Qty","MRP",
+       "Discount %","Selling Price","Line Amount"],
+      ...db.orders.flatMap(o => o.lines.map(l => {
+        const mrp = Number(l.item?.mrp || 0);
+        const price = mrp*(1-Number(o.discount)/100);
+        return [
+          o.id,l.code,l.item?.name || "",l.qty,mrp,
+          o.discount,price,price*Number(l.qty)
+        ];
+      }))
+    ]
+  };
+
+  const xmlEscape = v => String(v ?? "")
+    .replace(/&/g,"&amp;")
+    .replace(/</g,"&lt;")
+    .replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;");
+
+  let xml = '<?xml version="1.0"?>' +
+    '<?mso-application progid="Excel.Sheet"?>' +
+    '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" ' +
+    'xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">';
+
+  for (const [name,rows] of Object.entries(sheets)) {
+    xml += '<Worksheet ss:Name="' + xmlEscape(name) +
+      '"><Table>';
+    for (const row of rows) {
+      xml += "<Row>";
+      for (const value of row) {
+        const isNumber = typeof value === "number" &&
+          Number.isFinite(value);
+        xml += '<Cell><Data ss:Type="' +
+          (isNumber ? "Number" : "String") + '">' +
+          xmlEscape(value) + '</Data></Cell>';
+      }
+      xml += "</Row>";
+    }
+    xml += "</Table></Worksheet>";
+  }
+
+  xml += "</Workbook>";
+
+  download(
+    "B2B_All_Data_" + new Date().toISOString().slice(0,10) + ".xml",
+    xml,
+    "application/vnd.ms-excel"
+  );
+}
+
+</script>
+</body>
+</html>
