@@ -446,10 +446,24 @@ async function importItemExcel() {
       imported.push({code,name,mrp,cartons:cs});
     });
 
-    if(errors.length){
-      alert("Import stopped. Check Excel rows: "+errors.join(", "));
-      return;
-    }
+   
+if (errors.length) {
+  const details = errors.map(rowNumber => {
+    const row = rows[rowNumber - 1] || [];
+    return "Row " + rowNumber +
+      " | Item Code: " + JSON.stringify(row[0]) +
+      " | Name: " + JSON.stringify(row[1]) +
+      " | MRP: " + JSON.stringify(row[2]) +
+      " | Cartons: " + JSON.stringify(row[3]) +
+      " | Unit: " + JSON.stringify(row[4]);
+  });
+
+  console.error("Excel import errors:", details);
+  alert("Import stopped. First errors:\n" +
+        details.slice(0, 5).join("\n"));
+  return;
+}
+
 
     if(!imported.length){
       alert("No items found.");
