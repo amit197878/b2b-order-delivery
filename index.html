@@ -157,7 +157,12 @@ section.active{display:block}
 <option value="">Select locality if available</option>
 </select>
 <p class="muted" id="pinStatus"></p>
-<button onclick="saveCustomer()">Save Customer</button>
+<button id="customerSaveButton" onclick="saveCustomer()">
+  Save Customer
+</button>
+<button type="button" onclick="clearCustomerForm()">
+  Clear / New Customer
+</button>
 </div>
 <div class="panel">
 <h3>Saved Customers</h3>
@@ -213,6 +218,7 @@ db=JSON.parse(localStorage.getItem(KEY))||{};
 db.items ||= [];
 db.customers ||= [];
 db.orders ||= [];
+let editingCustomerId = null; 
 let cartons=[];
 let lines=[];
 const $=id=>document.getElementById(id);
@@ -285,11 +291,101 @@ function chooseLocality(){
 let o=window.pinOffices?.[Number(val("locality"))];
 if(o){$("ccity").value=o.District;$("cstate").value=o.State}
 }
-function saveCustomer(){
-if(!val("cname").trim()||!/^\d{6}$/.test(val("cpin"))){alert("Enter party name and valid PIN");return}
-let x={id:crypto.randomUUID(),name:val("cname"),mobile:[val("cm1"),val("cm2"),val("cm3")],gstin:val("cgst"),pin:val("cpin"),city:val("ccity"),state:val("cstate"),address:val("caddress")};
-db.customers.push(x);persist();alert("Customer saved");
+
+function editCustomer(id) {
+  const c = db.customers.find(x => x.id === id);
+
+  if (!c) {
+    alert("Customer not found.");
+    return;
+  }
+
+  editingCustomerId = id;
+
+  $("cname").value = c.name || "";
+  $("caddress").value = c.address || "";
+  $("ccity").value = c.city || "";
+  $("cstate").value = c.state || "";
+  $("cpin").value = c.pin || "";
+
+  $("cm1").value = c.mobile?.[0] || "";
+  $("cm2").value = c.mobile?.[1] || "";
+  $("cm3").value = c.mobile?.[2] || "";
+
+  $("cgst").value = c.gstin || "";
+
+  $("customerSaveButton").textContent = "Update Customer";
+
+  page("customers");
+  window.scrollTo({top:0,behavior:"smooth"});
 }
+
+function clearCustomerForm() {
+  editingCustomerId = null;
+
+  ["cname","caddress","ccity","cstate",
+   "cpin","cm1","cm2","cm3","cgst"].forEach(id => {
+    $(id).value = "";
+  });
+
+  $("customerSaveButton").textContent = "Save Customer";
+  $("pinStatus").textContent = "";
+  $("locality").innerHTML =
+    '<option value="">Select locality if available</option>';
+}
+    
+
+function saveCustomer() {
+  const name = val("cname").trim();
+  const pin = val("cpin").trim();
+
+  if (!name || !/^\d{6}$/.test(pin)) {
+    alert("Enter Party Name and a valid 6-digit PIN Code.");
+    return;
+  }
+
+  const duplicate = db.customers.find(c =>
+    c.id !== editingCustomerId &&
+    c.name.trim().toLowerCase() === name.toLowerCase() &&
+    String(c.pin) === pin
+  );
+
+  if (duplicate) {
+    alert("A customer with this Party Name and PIN already exists.");
+    return;
+  }
+
+  const record = {
+    id: editingCustomerId || crypto.randomUUID(),
+    name,
+    address: val("caddress").trim(),
+    city: val("ccity").trim(),
+    state: val("cstate").trim(),
+    pin,
+    mobile: [val("cm1"),val("cm2"),val("cm3")],
+    gstin: val("cgst").trim().toUpperCase()
+  };
+
+  if (editingCustomerId) {
+    const index = db.customers.findIndex(
+      c => c.id === editingCustomerId
+    );
+
+    if (index === -1) {
+      alert("Customer no longer exists.");
+      return;
+    }
+
+    db.customers[index] = record;
+  } else {
+    db.customers.push(record);
+  }
+
+  persist();
+  clearCustomerForm();
+  alert("Customer saved successfully.");
+}
+
 function addLine(){
 lines.push({code:db.items[0]?.code||"",qty:1});
 renderLines();
@@ -739,7 +835,34 @@ $("itemCount").textContent=db.items.length;
 $("customerCount").textContent=db.customers.length;
 $("orderCount").textContent=db.orders.length;
 $("itemRows").innerHTML=db.items.map(x=>`<tr><td>${esc(x.code)}</td><td>${esc(x.name)}</td><td>${money(x.mrp)}</td><td>${x.cartons.reduce((s,c)=>s+Number(c.gross)*Number(c.qty),0).toFixed(2)}</td><td>${x.cartons.reduce((s,c)=>s+cartonVolume(c),0).toFixed(4)}</td><td><button class="small" onclick="editItem('${esc(x.code)}')">Edit</button></td></tr>`).join("");
-$("customerRows").innerHTML=db.customers.map(x=>`<tr><td>${esc(x.name)}</td><td>${esc(x.city)}</td><td>${esc(x.state)}</td><td>${esc(x.pin)}</td></tr>`).join("");
+
+$("customerRows").innerHTML = `
+<tr style="background:#f1f5f9">
+  <th>Party Name</th>
+  <th>City</th>
+  <th>State</th>
+  <th>PIN Code</th>
+  <th>Mobile 1</th>
+  <th>GSTIN</th>
+  <th>Action</th>
+</tr>
+` + db.customers.map(c => `
+<tr>
+  <td>${esc(c.name)}</td>
+  <td>${esc(c.city)}</td>
+  <td>${esc(c.state)}</td>
+  <td>${esc(c.pin)}</td>
+  <td>${esc(c.mobile?.[0] || "")}</td>
+  <td>${esc(c.gstin || "")}</td>
+  <td>
+    <button class="small"
+      onclick="editCustomer('${c.id}')">
+      Edit
+    </button>
+  </td>
+</tr>
+`).join("");
+
 $("oparty").innerHTML=db.customers.map(x=>`<option value="${esc(x.id)}">${esc(x.name)}</option>`).join("");
 $("orderHistory").innerHTML=db.orders.map((o,i)=>`<div class="panel"><b>Order ${i+1}</b><p>${esc(db.customers.find(c=>c.id===o.party)?.name||"Customer")}</p><p>${money(o.totals.total)} | To-Pay freight ${money(o.freight)}</p><button onclick="download('order-${i+1}.json',JSON.stringify(db.orders[${i}],null,2),'application/json')">Export JSON</button></div>`).join("");
 }
