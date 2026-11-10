@@ -135,6 +135,9 @@ section.active{display:block}
 <h2>Backup & Restore</h2>
 <p>Export your local items, customers and orders regularly.</p>
 <button onclick="backup()">Download JSON Backup</button>
+<button onclick="exportExcel()">
+  Download All Data - Excel
+</button>
 <h3>Restore Backup</h3>
 <input type="file" accept=".json" id="restoreFile">
 <button onclick="restore()">Restore</button>
@@ -292,6 +295,96 @@ $("orderHistory").innerHTML=db.orders.map((o,i)=>`<div class="panel"><b>Order ${
 addCarton();
 addLine();
 page("home");
+
+function exportExcel() {
+  const sheets = {
+    "Item Master": [
+      ["Item Code","Item Name","MRP","Total Gross kg","Total CBM"],
+      ...db.items.map(x => [
+        x.code, x.name, x.mrp,
+        x.cartons.reduce((s,c) =>
+          s + Number(c.gross)*Number(c.qty),0),
+        x.cartons.reduce((s,c) => s + cartonVolume(c),0)
+      ])
+    ],
+    "Carton Details": [
+      ["Item Code","Carton Name","Qty","Length","Width",
+       "Height","Unit","Gross kg / Carton","Total CBM"],
+      ...db.items.flatMap(x => x.cartons.map(c => [
+        x.code,c.name,c.qty,c.l,c.w,c.h,c.unit,
+        c.gross,cartonVolume(c)
+      ]))
+    ],
+    "Customer Master": [
+      ["Party Name","Address","City","State","PIN",
+       "Mobile 1","Mobile 2","Mobile 3","GSTIN"],
+      ...db.customers.map(x => [
+        x.name,x.address,x.city,x.state,x.pin,
+        ...(x.mobile || []).concat(["","",""]).slice(0,3),
+        x.gstin
+      ])
+    ],
+    "Order Master": [
+      ["Order ID","Date","Customer ID","Discount %",
+       "Ex Factory","GST","Seller Total","Transporter",
+       "Service","To-Pay Freight"],
+      ...db.orders.map(o => [
+        o.id,o.date,o.party,o.discount,
+        o.totals.taxable,o.totals.gst,o.totals.total,
+        o.transport,o.service,o.freight
+      ])
+    ],
+    "Order Items": [
+      ["Order ID","Item Code","Item Name","Qty","MRP",
+       "Discount %","Selling Price","Line Amount"],
+      ...db.orders.flatMap(o => o.lines.map(l => {
+        const mrp = Number(l.item?.mrp || 0);
+        const price = mrp*(1-Number(o.discount)/100);
+        return [
+          o.id,l.code,l.item?.name || "",l.qty,mrp,
+          o.discount,price,price*Number(l.qty)
+        ];
+      }))
+    ]
+  };
+
+  const xmlEscape = v => String(v ?? "")
+    .replace(/&/g,"&amp;")
+    .replace(/</g,"&lt;")
+    .replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;");
+
+  let xml = '<?xml version="1.0"?>' +
+    '<?mso-application progid="Excel.Sheet"?>' +
+    '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" ' +
+    'xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">';
+
+  for (const [name,rows] of Object.entries(sheets)) {
+    xml += '<Worksheet ss:Name="' + xmlEscape(name) +
+      '"><Table>';
+    for (const row of rows) {
+      xml += "<Row>";
+      for (const value of row) {
+        const isNumber = typeof value === "number" &&
+          Number.isFinite(value);
+        xml += '<Cell><Data ss:Type="' +
+          (isNumber ? "Number" : "String") + '">' +
+          xmlEscape(value) + '</Data></Cell>';
+      }
+      xml += "</Row>";
+    }
+    xml += "</Table></Worksheet>";
+  }
+
+  xml += "</Workbook>";
+
+  download(
+    "B2B_All_Data_" + new Date().toISOString().slice(0,10) + ".xml",
+    xml,
+    "application/vnd.ms-excel"
+  );
+}
+
 </script>
 </body>
 </html>
